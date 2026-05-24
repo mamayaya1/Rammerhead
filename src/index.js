@@ -58,7 +58,22 @@ app.use(serveStatic(fileURLToPath(new URL("../static/", import.meta.url))));
 
 server.on("request", app);
 server.on("upgrade", (req, socket, head) => {
-    if(shouldRouteRh(req)) rh.emit("upgrade", req, socket, head); else socket.end();
+    // Add CORS headers for WebSocket upgrade
+    try {
+        socket.write(
+            "HTTP/1.1 101 Switching Protocols\r\n" +
+            "Access-Control-Allow-Origin: *\r\n" +
+            "Access-Control-Allow-Methods: GET, POST, OPTIONS\r\n" +
+            "Access-Control-Allow-Headers: Content-Type\r\n" +
+            "\r\n"
+        );
+    } catch (e) {}
+
+    if (shouldRouteRh(req)) {
+        rh.emit("upgrade", req, socket, head);
+    } else {
+        socket.end();
+    }
 });
 
 server.on("listening", () => {
