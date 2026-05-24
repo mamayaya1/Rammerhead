@@ -170,12 +170,15 @@ window.addEventListener("error", setError);
             await api.editsession(id, httpproxy, enableShuffling);
             editSession(id, httpproxy, enableShuffling);
             const shuffleDict = await api.shuffleDict(id);
-            if (!shuffleDict) {
-                window.location.href = "/" + id + "/" + url;
-            } else {
-                var shuffler = new StrShuffler(shuffleDict);
-                window.location.href = "/" + id + "/" + shuffler.shuffle(url);
-            }
+          const backend = "https://rammerhead-547q.onrender.com";
+
+if (!shuffleDict) {
+    window.location.href = backend + "/" + id + "/" + url;
+} else {
+    var shuffler = new StrShuffler(shuffleDict);
+    window.location.href = backend + "/" + id + "/" + shuffler.shuffle(url);
+}
+
         }
         document.getElementById("session-go").onclick = go;
         document.getElementById("session-url").addEventListener("keydown", (event) => {
