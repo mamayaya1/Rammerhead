@@ -104,8 +104,36 @@ const rh = createRammerhead({
 
 
 // MIDDLEWARE PATTERN: Safely forces the browser to upgrade insecure asset requests 
+// Locate your middleware pattern block:
 app.use((req, res, next) => {
     res.setHeader('Content-Security-Policy', 'upgrade-insecure-requests;');
+    
+    // OVERRIDE WRAPPER: Forcefully intercept outgoing data streams to rewrite worker protocol schemas
+    const originalWrite = res.write;
+    const originalEnd = res.end;
+
+    res.write = function (chunk, encoding, callback) {
+        if (chunk && typeof chunk.toString === 'function') {
+            let str = chunk.toString();
+            if (str.includes('http://rammerhead-w7hm.onrender.com')) {
+                str = str.replace(/http:\/\/rammerhead-w7hm\.onrender\.com/g, 'https://rammerhead-w7hm.onrender.com');
+                chunk = Buffer.from(str, encoding);
+            }
+        }
+        return originalWrite.call(this, chunk, encoding, callback);
+    };
+
+    res.end = function (chunk, encoding, callback) {
+        if (chunk && typeof chunk.toString === 'function') {
+            let str = chunk.toString();
+            if (str.includes('http://rammerhead-w7hm.onrender.com')) {
+                str = str.replace(/http:\/\/rammerhead-w7hm\.onrender\.com/g, 'https://rammerhead-w7hm.onrender.com');
+                chunk = Buffer.from(str, encoding);
+            }
+        }
+        return originalEnd.call(this, chunk, encoding, callback);
+    };
+
     next();
 });
 
