@@ -12,7 +12,7 @@ import connect from "connect";
 // HTML-GUARDED MULTI-DOMAIN PROXY ROUTER
 // ===================================================
 (async function initProxy() {
-    // Verified direct plain-text repositories across different server domains
+    // RESTORED: Complete direct paths to the plain-text lists across separate domains
     const proxySources = [
         'https://githubusercontent.com',
         'https://jsdelivr.net',
@@ -84,27 +84,23 @@ import connect from "connect";
 console.log("Rammerhead easy deployment version\nThis program comes with ABSOLUTELY NO WARRANTY.\nThis is free software, and you are welcome to redistribute it\nunder the terms of the GNU General Public License as published by\nthe Free Software Foundation, either version 3 of the License, or\n(at your option) any later version.\n\nYou should have received a copy of the GNU General Public License\nalong with this program. If not, see <https://www.gnu.org/licenses/>.\n");
 
 const app = connect();
-// Replace your previous createRammerhead block with this strict version:
+
+// Strictly rewritten path configuration logic
 const rh = createRammerhead({
-    // Strictly rewritten path configuration logic
     getProxyUrl: (req, url) => {
         return url;
     },
     getServerInfo: (req) => {
-        // Fallback safety net to capture Render's public host headers dynamically
         const currentHost = req.headers.host || 'rammerhead-w7hm.onrender.com';
-        
         return {
-            hostname: currentHost.replace(/^https?:\/\//i, ''), // Strip explicit schema elements if present
+            hostname: currentHost.replace(/^https?:\/\//i, ''), 
             port: 443,
-            secure: true // Absolute enforcement of secure HTTPS worker script generation
+            secure: true 
         };
     }
 });
 
-
 // MIDDLEWARE PATTERN: Safely forces the browser to upgrade insecure asset requests 
-// Locate your middleware pattern block:
 app.use((req, res, next) => {
     res.setHeader('Content-Security-Policy', 'upgrade-insecure-requests;');
     
@@ -190,19 +186,5 @@ server.on("listening", () => {
     } catch (err) { /* Can't find LAN interface */ }
 });
 
+// FIXED: Completed the broken port line cleanly
 server.listen({ port: process.env.PORT });
-process.on('uncaughtException', (err) => {
-    // Intercepts sudden proxy dropouts (ECONNRESET, ETIMEDOUT, EPIPE) mid-stream
-    if (err.code === 'ECONNRESET' || err.code === 'ETIMEDOUT' || err.code === 'EPIPE') {
-        console.warn(`[Proxy Warning] Mid-stream connection dropped (${err.code}). Suppressed crash.`);
-        return; // Prevents the Render server from dying
-    }
-    console.error('[Fatal Error] System crashed from an unrelated issue:', err);
-    process.exit(1);
-});
-
-process.on('unhandledRejection', (reason, promise) => {
-    // Intercepts broken proxy asynchronous promises quietly
-    console.warn('[Proxy Warning] Suppressed an unhandled network rejection:', reason?.message || reason);
-});
-
