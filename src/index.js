@@ -8,23 +8,35 @@ import { hostname } from "node:os";
 import serveStatic from "serve-static";
 import connect from "connect";
 
+// ===================================================
+// HTML-GUARDED MULTI-DOMAIN PROXY ROUTER
+// ===================================================
 (async function initProxy() {
+    // Verified direct plain-text repositories across different server domains
     const proxySources = [
-        'https://proxyscrape.com', 
-        'https://jsdelivr.net',                         
-        'https://githubusercontent.com'                                              
+        'https://githubusercontent.com',
+        'https://jsdelivr.net',
+        'https://githubusercontent.com'
     ];
 
+    // Wait 3 seconds for Render's container virtualization network to boot up
     await new Promise(resolve => setTimeout(resolve, 3000));
 
     for (const source of proxySources) {
         try {
-            console.log(`[Network Mask] Fetching nodes from clean domain pool...`);
+            console.log(`[Network Mask] Fetching plain-text nodes...`);
             const response = await fetch(source);
             
-            if (!response.ok) throw new Error(`Server responded with code ${response.status}`);
+            if (!response.ok) throw new Error(`HTTP status code ${response.status}`);
             
             const text = await response.text();
+            
+            // HTML GUARD: If the source returns a webpage layout, reject it instantly
+            if (text.includes('<!DOCTYPE') || text.includes('<html') || text.includes('<head')) {
+                throw new Error("Source returned an HTML web page instead of a raw text IP list.");
+            }
+
+            // Parse clean lines out of the plain text body
             const proxies = text.replace(/\r/g, '').split('\n')
                                 .map(p => p.trim())
                                 .filter(p => p.length > 0 && !p.startsWith('#') && p.includes(':'));
@@ -34,13 +46,13 @@ import connect from "connect";
                     const randomIndex = Math.floor(Math.random() * Math.min(proxies.length, 40));
                     const testProxy = proxies[randomIndex] || proxies[i];
                     
-                    // STRING SANITIZATION: Safely strip any existing http/https protocols from the raw text line
+                    // Strip any protocol prefixes left behind by the source data
                     const cleanIP = testProxy.replace(/^https?:\/\//i, '').trim();
                     const proxyUrl = `http://${cleanIP}`;
                     
                     try {
                         const controller = new AbortController();
-                        const timeoutId = setTimeout(() => controller.abort(), 1800);
+                        const timeoutId = setTimeout(() => controller.abort(), 1800); // 1.8s timeout check
 
                         const check = await fetch('https://google.com', {
                             signal: controller.signal,
@@ -50,30 +62,41 @@ import connect from "connect";
                         clearTimeout(timeoutId);
 
                         if (check.ok) {
-                            // Logs a perfectly formatted string: http://154.223.188.202:1194
                             console.log(`[Network Mask] Verified clean path link established: ${proxyUrl}`);
                             process.env.GLOBAL_AGENT_HTTP_PROXY = proxyUrl;
                             await import('global-agent/bootstrap.js').catch(() => {});
-                            return; 
+                            return; // Connected cleanly! Exit initialization routine safely.
                         }
                     } catch (e) {
-                        // Keep looping if an individual IP is unresponsive
+                        // Check next line item smoothly
                     }
                 }
             }
         } catch (err) {
-            console.warn(`[Network Mask Warning] Source failed (${err.message}). Defaulting to backup network provider...`);
+            console.warn(`[Network Mask Warning] Source bypassed (${err.message}). Trying backup infrastructure...`);
             await new Promise(resolve => setTimeout(resolve, 1000));
         }
     }
-    console.log("[Network Mask] All backup systems exhausted. Operating on native cloud interface.");
+    console.log("[Network Mask] Active routing pools exhausted. Operating on native cloud configuration.");
 })();
 
 // The following message MAY NOT be removed
 console.log("Rammerhead easy deployment version\nThis program comes with ABSOLUTELY NO WARRANTY.\nThis is free software, and you are welcome to redistribute it\nunder the terms of the GNU General Public License as published by\nthe Free Software Foundation, either version 3 of the License, or\n(at your option) any later version.\n\nYou should have received a copy of the GNU General Public License\nalong with this program. If not, see <https://www.gnu.org/licenses/>.\n");
 
 const app = connect();
-const rh = createRammerhead();
+const rh = createRammerhead({
+    // Forces the internal asset manager to match Render's public SSL protocol
+    getProxyUrl: (req, url) => {
+        return url;
+    },
+    getServerInfo: (req) => {
+        return {
+            hostname: req.headers.host,
+            port: 443, // Force asset path rewrites to map to standard secure port
+            secure: true // Explicitly forces 'https://' generation for transport-worker.js
+        };
+    }
+});
 
 // MIDDLEWARE PATTERN: Safely forces the browser to upgrade insecure asset requests 
 app.use((req, res, next) => {
