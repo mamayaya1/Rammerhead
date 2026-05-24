@@ -121,3 +121,18 @@ server.on("listening", () => {
 });
 
 server.listen({ port: process.env.PORT });
+process.on('uncaughtException', (err) => {
+    // Intercepts sudden proxy dropouts (ECONNRESET, ETIMEDOUT, EPIPE) mid-stream
+    if (err.code === 'ECONNRESET' || err.code === 'ETIMEDOUT' || err.code === 'EPIPE') {
+        console.warn(`[Proxy Warning] Mid-stream connection dropped (${err.code}). Suppressed crash.`);
+        return; // Prevents the Render server from dying
+    }
+    console.error('[Fatal Error] System crashed from an unrelated issue:', err);
+    process.exit(1);
+});
+
+process.on('unhandledRejection', (reason, promise) => {
+    // Intercepts broken proxy asynchronous promises quietly
+    console.warn('[Proxy Warning] Suppressed an unhandled network rejection:', reason?.message || reason);
+});
+
