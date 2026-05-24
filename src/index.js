@@ -9,16 +9,16 @@ import serveStatic from "serve-static";
 import connect from "connect";
 
 // ===================================================
-// HTML-GUARDED STABLE PROXY SCRAPER 
+// AUTOMATED PROXY SCRAPER (Unrestricted Environments)
 // ===================================================
 (async function initProxy() {
-    // FIXED: Real, direct links to full plain text asset repositories
     const proxySources = [
         'https://githubusercontent.com',
         'https://jsdelivr.net',
         'https://githubusercontent.com'
     ];
 
+    // Brief startup pause
     await new Promise(resolve => setTimeout(resolve, 2000));
 
     for (const source of proxySources) {
@@ -84,7 +84,7 @@ const rh = createRammerhead({
         return url;
     },
     getServerInfo: (req) => {
-        // DYNAMIC: Reads your active environment host headers automatically
+        // DYNAMIC: Reads your active Codespace domain automatically
         const currentHost = req.headers.host || 'localhost';
         return {
             hostname: currentHost.replace(/^https?:\/\//i, ''), 
@@ -94,7 +94,7 @@ const rh = createRammerhead({
     }
 });
 
-// MIDDLEWARE PATTERN: Dynamically patches protocol streams for Codespaces and Koyeb
+// MIDDLEWARE PATTERN: Automatically updates protocols for whatever domain you use
 app.use((req, res, next) => {
     res.setHeader('Content-Security-Policy', 'upgrade-insecure-requests;');
     
@@ -139,7 +139,7 @@ const rammerheadScopes = [
 const rammerheadSession = /^\/[a-z0-9]{32}/;
 
 function shouldRouteRh(req) {
-    const url = new URL(req.url, "http://0.0.0.0");
+    const url = new URL(req.url, "http://0.0.0");
     return (rammerheadScopes.includes(url.pathname) || rammerheadSession.test(url.pathname));
 }
 
