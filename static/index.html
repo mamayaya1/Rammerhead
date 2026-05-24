@@ -2,186 +2,176 @@
 <html>
 <head>
     <meta charset="UTF-8" />
-    <title>Rammerhead - Multi-Tab</title>
+    <title>Rammerhead Multi‑Tab</title>
+
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css">
-    <link rel="icon" type="image/png" href="favicon.png" />
     <link rel="stylesheet" href="style.css">
+
+    <!-- Rammerhead core logic -->
     <script src="script.js" type="module"></script>
 </head>
+
 <body>
-    <!-- Rammerhead core UI (dark themed by CSS) -->
-    <div class="container mb-4">
-        <p class="mt-3 mb-3 fw">
-            Join the
-            <a href="https://amethystnetwork-dev.github.io/discord/invite" target="_blank">Amethyst Network Discord server</a>
-            or
-            <a href="https://github.com/amethystnetwork-dev/Rammerhead" target="_blank">Fork me on GitHub</a>
-        </p>
 
-        <p class="mb-0 fw-bold">
-            Notice: inactive sessions will be deleted after 3 days or if the server shuts down and does not persist files.
-        </p>
-        <p class="mb-3 fw-bold">
-            Notice 2: Treat every session id like an isolated incognito browser that belongs only to you. DO NOT SHARE THE SESSION ID.
-            All logins that you make with the session id will be saved in that session. Anyone that has your session id or session url
-            CAN ACCESS your logged in sites.
-        </p>
+<!-- RAMMERHEAD CONTROLS (dark themed by CSS) -->
+<div class="container mb-4">
 
-        <p class="mb-3 fw-bold text-danger" id="error-text" style="display: none">Error: some text</p>
+    <p class="mb-3 fw-bold text-danger" id="error-text" style="display:none">Error: some text</p>
 
-        <div class="input-group mb-2" id="password-wrapper" style="display: none">
-            <span class="input-group-text">Enter password</span>
-            <input type="password" class="form-control" id="session-password"
-                   placeholder="Password is given by host of this site.">
+    <!-- URL + GO BUTTON (THIS GO BUTTON ADDS A TAB) -->
+    <div class="input-group mb-2">
+        <span class="input-group-text">Enter URL</span>
+        <input type="text" class="form-control" id="session-url" placeholder="https://www.google.com/">
+        <button class="btn btn-success" type="button" id="session-go">Go!</button>
+    </div>
+
+    <!-- SESSION ID (ONLY ONE) -->
+    <div class="input-group mb-4">
+        <span class="input-group-text">Session ID</span>
+        <input readonly type="text" class="form-control disable-text" id="session-id"
+               placeholder="Click 'Create new session ID' below">
+        <button class="btn btn-secondary" type="button" id="session-create-btn">Create new session ID</button>
+    </div>
+
+    <!-- ADVANCED OPTIONS -->
+    <button class="btn btn-outline-secondary mb-2" id="session-advanced-toggle">Show advanced options</button>
+
+    <div class="mt-2 mb-4" id="session-advanced-container" style="display:none">
+        <div class="form-check mb-1">
+            <input class="form-check-input" type="checkbox" id="session-shuffling" checked>
+            <label class="form-check-label" for="session-shuffling">Enable URL Shuffling</label>
         </div>
 
-        <!-- Rammerhead URL + Session controls (kept, dark themed) -->
-        <div class="input-group mb-2">
-            <span class="input-group-text">Enter URL</span>
-            <input type="text" class="form-control" id="session-url" placeholder="https://www.google.com/">
-            <button class="btn btn-success" type="button" id="session-go">Go!</button>
-        </div>
-
-        <div class="input-group mb-4">
-            <span class="input-group-text">Session ID</span>
-            <input readonly type="text" class="form-control disable-text" id="session-id"
-                   placeholder="click on 'Create new session ID' or 'Fill in existing session ID' from below">
-            <button class="btn btn-secondary" type="button" id="session-create-btn">Create new session ID</button>
-        </div>
-
-        <button class="btn btn-outline-secondary mb-2" id="session-advanced-toggle">Show advanced options</button>
-
-        <div class="mt-2 mb-4" id="session-advanced-container" style="display: none">
-            <div class="form-check mb-1">
-                <input class="form-check-input" type="checkbox" value="" id="session-shuffling" checked>
-                <label class="form-check-label" for="session-shuffling">Enable URL Shuffling</label>
-            </div>
-            <div class="input-group mb-3">
-                <span class="input-group-text">HTTP Proxy</span>
-                <input type="text" class="form-control" id="session-httpproxy"
-                       placeholder="http://username:password@proxyipaddress:proxyport">
-            </div>
+        <div class="input-group mb-3">
+            <span class="input-group-text">HTTP Proxy</span>
+            <input type="text" class="form-control" id="session-httpproxy"
+                   placeholder="http://username:password@proxyipaddress:proxyport">
         </div>
     </div>
 
-    <!-- Your dark multi-tab UI, integrated with Rammerhead controls -->
-    <div id="controls">
-        <span id="controls-label">Multi‑Tab Session</span>
-        <!-- Uses the same URL input (#session-url) -->
-        <button id="addTabBtn" type="button">Add Tab</button>
-    </div>
+</div>
 
-    <div id="tabs" aria-label="Tabs"></div>
-    <div id="frameWrap" aria-label="Frames"></div>
 
-    <!-- Rammerhead session table (kept, dark themed) -->
-    <div class="row justify-content-center m-0 mt-3">
-        <table class="table w-75 table-striped table-bordered">
-            <thead>
-                <tr>
-                    <th>Session ID</th>
-                    <th>Created on</th>
-                </tr>
-            </thead>
-            <tbody>
-            </tbody>
-        </table>
-    </div>
+<!-- YOUR DARK MULTI‑TAB UI -->
+<div id="controls">
+    <span id="controls-label">Multi‑Tab Session</span>
+</div>
 
-    <!-- Your old tab logic, adapted to use Rammerhead session ID -->
-    <script>
-    (function(){
-        let tabCount = 0;
+<div id="tabs"></div>
+<div id="frameWrap"></div>
 
-        function normalizeUrl(input) {
-            let url = input.trim();
-            if (!url) return null;
-            if (!/^https?:\/\//i.test(url)) url = "https://" + url;
 
-            const sessionId = document.getElementById("session-id").value;
-            if (!sessionId) {
-                alert("Create a session ID first!");
-                return null;
+<!-- SESSION TABLE -->
+<div class="row justify-content-center m-0 mt-3">
+    <table class="table w-75 table-striped table-bordered">
+        <thead>
+            <tr>
+                <th>Session ID</th>
+                <th>Created on</th>
+            </tr>
+        </thead>
+        <tbody></tbody>
+    </table>
+</div>
+
+
+<!-- YOUR OLD TAB LOGIC (FIXED + CLEAN) -->
+<script>
+(function(){
+    let tabCount = 0;
+
+    function normalizeUrl(input) {
+        let url = input.trim();
+        if (!url) return null;
+        if (!/^https?:\/\//i.test(url)) url = "https://" + url;
+
+        const sessionId = document.getElementById("session-id").value;
+        if (!sessionId) {
+            alert("Create a session ID first!");
+            return null;
+        }
+
+        return `/${sessionId}/?url=${encodeURIComponent(url)}`;
+    }
+
+    function addTab(urlInput) {
+        const url = normalizeUrl(urlInput);
+        if (!url) return;
+
+        const id = "tab" + (++tabCount);
+
+        // TAB BUTTON
+        const tab = document.createElement("div");
+        tab.className = "tab";
+        tab.id = id + "-btn";
+        tab.innerHTML = `
+            <span class="title">${urlInput}</span>
+            <button class="close" type="button">×</button>
+        `;
+
+        tab.addEventListener("click", function(e){
+            if (e.target.classList.contains("close")) {
+                closeTab(id);
+                return;
             }
-
-            // Use existing Rammerhead session
-            return `/${sessionId}/?url=${encodeURIComponent(url)}`;
-        }
-
-        function addTabFromCurrentInput() {
-            const raw = document.getElementById("session-url").value || "";
-            addTab(raw);
-        }
-
-        function addTab(urlInput) {
-            const url = normalizeUrl(urlInput);
-            if (!url) return;
-
-            const id = "tab" + (++tabCount);
-
-            // Create tab button
-            const tab = document.createElement("div");
-            tab.className = "tab";
-            tab.id = id + "-btn";
-            tab.innerHTML = `<span class="title">${urlInput}</span><button class="close" type="button" aria-label="Close">×</button>`;
-            tab.addEventListener("click", function(e){
-                if (e.target.classList.contains("close")) {
-                    closeTab(id);
-                    return;
-                }
-                activateTab(id);
-            });
-            document.getElementById("tabs").appendChild(tab);
-
-            // Create iframe
-            const iframe = document.createElement("iframe");
-            iframe.src = url;
-            iframe.id = id;
-            document.getElementById("frameWrap").appendChild(iframe);
-
             activateTab(id);
-        }
-
-        function activateTab(id) {
-            document.querySelectorAll(".tab").forEach(t => t.classList.remove("active"));
-            document.querySelectorAll("#frameWrap iframe").forEach(f => f.classList.remove("active"));
-            const tabBtn = document.getElementById(id + "-btn");
-            const frame = document.getElementById(id);
-            if (tabBtn && frame) {
-                tabBtn.classList.add("active");
-                frame.classList.add("active");
-            }
-        }
-
-        function closeTab(id) {
-            const tabBtn = document.getElementById(id + "-btn");
-            const frame = document.getElementById(id);
-            if (!tabBtn || !frame) return;
-
-            const isActive = tabBtn.classList.contains("active");
-            const nextBtn = tabBtn.previousElementSibling || tabBtn.nextElementSibling;
-
-            tabBtn.remove();
-            frame.remove();
-
-            if (isActive && nextBtn) {
-                activateTab(nextBtn.id.replace("-btn", ""));
-            }
-        }
-
-        window.addEventListener("DOMContentLoaded", function(){
-            const addBtn = document.getElementById("addTabBtn");
-            const urlInput = document.getElementById("session-url");
-
-            addBtn.addEventListener("click", function(){
-                addTabFromCurrentInput();
-            });
-
-            urlInput.addEventListener("keydown", function(e){
-                if (e.key === "Enter") addTabFromCurrentInput();
-            });
         });
-    })();
-    </script>
+
+        document.getElementById("tabs").appendChild(tab);
+
+        // IFRAME
+        const iframe = document.createElement("iframe");
+        iframe.src = url;
+        iframe.id = id;
+        document.getElementById("frameWrap").appendChild(iframe);
+
+        activateTab(id);
+    }
+
+    function activateTab(id) {
+        document.querySelectorAll(".tab").forEach(t => t.classList.remove("active"));
+        document.querySelectorAll("#frameWrap iframe").forEach(f => f.classList.remove("active"));
+
+        const tabBtn = document.getElementById(id + "-btn");
+        const frame = document.getElementById(id);
+
+        if (tabBtn && frame) {
+            tabBtn.classList.add("active");
+            frame.classList.add("active");
+        }
+    }
+
+    function closeTab(id) {
+        const tabBtn = document.getElementById(id + "-btn");
+        const frame = document.getElementById(id);
+
+        const isActive = tabBtn.classList.contains("active");
+        const nextBtn = tabBtn.previousElementSibling || tabBtn.nextElementSibling;
+
+        tabBtn.remove();
+        frame.remove();
+
+        if (isActive && nextBtn) {
+            activateTab(nextBtn.id.replace("-btn", ""));
+        }
+    }
+
+    // GO BUTTON = ADD TAB
+    window.addEventListener("DOMContentLoaded", function(){
+        const goBtn = document.getElementById("session-go");
+        const urlInput = document.getElementById("session-url");
+
+        goBtn.addEventListener("click", function(){
+            addTab(urlInput.value);
+        });
+
+        urlInput.addEventListener("keydown", function(e){
+            if (e.key === "Enter") addTab(urlInput.value);
+        });
+    });
+
+})();
+</script>
+
 </body>
 </html>
