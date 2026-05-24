@@ -9,33 +9,34 @@ import serveStatic from "serve-static";
 import connect from "connect";
 
 (async function initProxy() {
-    // List of highly reliable plain-text proxy repositories
     const proxySources = [
-        'https://githubusercontent.com',
-        'https://cdn.jsdelivr.net/gh/proxifly/free-proxy-list@main/proxies/protocols/http/data.txt',
-        'https://proxyscrape.com'
+        'https://proxyscrape.com', 
+        'https://jsdelivr.net',                         
+        'https://githubusercontent.com'                                              
     ];
 
-    // Give Render's container 3 seconds to fully bring the network online before fetching
     await new Promise(resolve => setTimeout(resolve, 3000));
 
     for (const source of proxySources) {
         try {
-            console.log(`[Network Mask] Attempting to fetch nodes from source...`);
+            console.log(`[Network Mask] Fetching nodes from clean domain pool...`);
             const response = await fetch(source);
             
-            if (!response.ok) throw new Error(`HTTP status ${response.status}`);
+            if (!response.ok) throw new Error(`Server responded with code ${response.status}`);
             
             const text = await response.text();
-            const proxies = text.split('\n').map(p => p.trim()).filter(p => p.length > 0 && !p.startsWith('#'));
+            const proxies = text.replace(/\r/g, '').split('\n')
+                                .map(p => p.trim())
+                                .filter(p => p.length > 0 && !p.startsWith('#') && p.includes(':'));
 
             if (proxies.length > 0) {
-                // Test up to 15 proxies from the active list to find a living gateway
                 for (let i = 0; i < Math.min(proxies.length, 15); i++) {
-                    // Randomize index slightly so we don't always hit the same dead ones
-                    const randomIndex = Math.floor(Math.random() * Math.min(proxies.length, 30));
+                    const randomIndex = Math.floor(Math.random() * Math.min(proxies.length, 40));
                     const testProxy = proxies[randomIndex] || proxies[i];
-                    const proxyUrl = `http://${testProxy.trim()}`;
+                    
+                    // STRING SANITIZATION: Safely strip any existing http/https protocols from the raw text line
+                    const cleanIP = testProxy.replace(/^https?:\/\//i, '').trim();
+                    const proxyUrl = `http://${cleanIP}`;
                     
                     try {
                         const controller = new AbortController();
@@ -49,20 +50,20 @@ import connect from "connect";
                         clearTimeout(timeoutId);
 
                         if (check.ok) {
+                            // Logs a perfectly formatted string: http://154.223.188.202:1194
                             console.log(`[Network Mask] Verified clean path link established: ${proxyUrl}`);
                             process.env.GLOBAL_AGENT_HTTP_PROXY = proxyUrl;
                             await import('global-agent/bootstrap.js').catch(() => {});
-                            return; // Success! Exit initialization loop completely
+                            return; 
                         }
                     } catch (e) {
-                        // Move to next individual proxy line
+                        // Keep looping if an individual IP is unresponsive
                     }
                 }
             }
         } catch (err) {
-            console.warn(`[Network Mask Warning] Source failed (${err.message}). Trying backup source...`);
-            // Brief pause before trying the next backup URL repository link
-            await new Promise(resolve => setTimeout(resolve, 1500));
+            console.warn(`[Network Mask Warning] Source failed (${err.message}). Defaulting to backup network provider...`);
+            await new Promise(resolve => setTimeout(resolve, 1000));
         }
     }
     console.log("[Network Mask] All backup systems exhausted. Operating on native cloud interface.");
