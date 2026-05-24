@@ -202,3 +202,23 @@ table.table-bordered > tbody > tr > td {
 #frameWrap iframe.active {
     display: block;
 }
+/* Force white text for all Rammerhead input labels */
+.input-group-text {
+    color: #ffffff !important;
+}
+
+/* Force white text inside all inputs */
+.form-control {
+    color: #ffffff !important;
+}
+
+/* Make placeholder text light gray so it's visible on dark background */
+.form-control::placeholder {
+    color: #cccccc !important;
+}
+
+/* Table text stays white */
+table, th, td {
+    color: #ffffff !important;
+}
+
