@@ -1,21 +1,22 @@
+const backend = "https://rammerhead-547q.onrender.com";
 export default class Api {
     constructor() {
         this.ok = true;
     }
 
     async needpassword() {
-        const res = await this.get("/needpassword");
+       const res = await this.get(backend + "/needpassword");
         return res === "true";
     }
 
     async newsession() {
-        const res = await this.get("/newsession");
+      const res = await this.get(backend + "/newsession");
         return res;
     }
 
     async editsession(id, httpProxy, enableShuffling) {
         const res = await this.get(
-            "/editsession?id=" +
+           backend + "/editsession?id=" +
             encodeURIComponent(id) +
             (httpProxy ? "&httpProxy=" + encodeURIComponent(httpProxy) : "") +
             "&enableShuffling=" + (enableShuffling ? "1" : "0"),
@@ -24,7 +25,7 @@ export default class Api {
     }
 
     async sessionexists(id) {
-        const res = await this.get("/sessionexists?id=" + encodeURIComponent(id));
+     const res = await this.get(backend + "/sessionexists?id=" + encodeURIComponent(id));
         if (res === "exists") return true;
         if (res === "not found") return false;
         throw `unexpected response from server. received ${res}`;
@@ -33,13 +34,13 @@ export default class Api {
     async deletesession(id) {
         const exists = await this.sessionexists(id);
         if (exists) {
-            const res = await this.get("/deletesession?id=" + id);
+           const res = await this.get(backend + "/deletesession?id=" + id);
             if (res !== "Success" && res !== "not found") throw `unexpected response from server. received ${res}`;
         }
     }
 
     async shuffleDict(id) {
-        const res = await this.get("/api/shuffleDict?id=" + encodeURIComponent(id));
+        const res = await this.get(backend + "/api/shuffleDict?id=" + encodeURIComponent(id));
         return JSON.parse(res);
     }
 
