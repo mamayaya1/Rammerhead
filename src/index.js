@@ -20,6 +20,21 @@ process.env.NODE_TLS_REJECT_UNAUTHORIZED = '0';
         console.error("[Network Mask Failed] Falling back to default host:", err.message);
     }
 })();
+// Force Rammerhead core scripts to map to HTTPS routing profiles on Render
+process.env.PORT = process.env.PORT || 10000;
+process.env.NODE_TLS_REJECT_UNAUTHORIZED = '0';
+
+// Inject headers into Rammerhead's response wrapper to clear mixed content errors
+// This instructs your browser to auto-upgrade any insecure asset calls to HTTPS
+const http = require('http');
+const originalCreateServer = http.createServer;
+http.createServer = function (app) {
+    return originalCreateServer.call(this, (req, res) => {
+        res.setHeader('Content-Security-Policy', 'upgrade-insecure-requests;');
+        if (app) app(req, res);
+    });
+};
+
 import createRammerhead from "rammerhead/src/server/index.js";
 
 import { fileURLToPath } from "node:url";
