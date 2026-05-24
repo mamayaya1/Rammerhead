@@ -2,176 +2,62 @@
 <html>
 <head>
     <meta charset="UTF-8" />
-    <title>Rammerhead Multi‑Tab</title>
+    <title>Rammerhead</title>
 
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css">
+    <link rel="icon" type="image/png" href="favicon.png" />
     <link rel="stylesheet" href="style.css">
-
-    <!-- Rammerhead core logic -->
     <script src="script.js" type="module"></script>
 </head>
-
 <body>
+    <div class="container mb-5">
+        <p class="mb-3 fw-bold text-danger" id="error-text" style="display: none">Error: some text</p>
 
-<!-- RAMMERHEAD CONTROLS (dark themed by CSS) -->
-<div class="container mb-4">
-
-    <p class="mb-3 fw-bold text-danger" id="error-text" style="display:none">Error: some text</p>
-
-    <!-- URL + GO BUTTON (THIS GO BUTTON ADDS A TAB) -->
-    <div class="input-group mb-2">
-        <span class="input-group-text">Enter URL</span>
-        <input type="text" class="form-control" id="session-url" placeholder="https://www.google.com/">
-        <button class="btn btn-success" type="button" id="session-go">Go!</button>
-    </div>
-
-    <!-- SESSION ID (ONLY ONE) -->
-    <div class="input-group mb-4">
-        <span class="input-group-text">Session ID</span>
-        <input readonly type="text" class="form-control disable-text" id="session-id"
-               placeholder="Click 'Create new session ID'">
-        <button class="btn btn-secondary" type="button" id="session-create-btn">Create new session ID</button>
-    </div>
-
-    <!-- ADVANCED OPTIONS -->
-    <button class="btn btn-outline-secondary mb-2" id="session-advanced-toggle">Show advanced options</button>
-
-    <div class="mt-2 mb-4" id="session-advanced-container" style="display:none">
-        <div class="form-check mb-1">
-            <input class="form-check-input" type="checkbox" id="session-shuffling" checked>
-            <label class="form-check-label" for="session-shuffling">Enable URL Shuffling</label>
+        <div class="input-group mb-2" id="password-wrapper" style="display: none">
+            <span class="input-group-text">Enter password</span>
+            <input type="password" class="form-control" id="session-password"
+                   placeholder="Password is given by host of this site.">
         </div>
 
-        <div class="input-group mb-3">
-            <span class="input-group-text">HTTP Proxy</span>
-            <input type="text" class="form-control" id="session-httpproxy"
-                   placeholder="http://username:password@proxyipaddress:proxyport">
+        <div class="input-group mb-2">
+            <span class="input-group-text">Enter URL</span>
+            <input type="text" class="form-control" id="session-url" placeholder="https://www.google.com/">
+            <button class="btn btn-success" type="button" id="session-go">Go!</button>
+        </div>
+
+        <div class="input-group mb-4">
+            <span class="input-group-text">Session ID</span>
+            <input readonly type="text" class="form-control disable-text" id="session-id"
+                   placeholder="click on 'Create new session ID' or 'Fill in existing session ID' from below">
+            <button class="btn btn-secondary" type="button" id="session-create-btn">Create new session ID</button>
+        </div>
+
+        <button class="btn btn-outline-secondary" id="session-advanced-toggle">Show advanced options</button>
+
+        <div class="mt-2 mb-4" id="session-advanced-container" style="display: none">
+            <div class="form-check mb-1">
+                <input class="form-check-input" type="checkbox" value="" id="session-shuffling" checked>
+                <label class="form-check-label" for="session-shuffling">Enable URL Shuffling</label>
+            </div>
+            <div class="input-group mb-3">
+                <span class="input-group-text">HTTP Proxy</span>
+                <input type="text" class="form-control" id="session-httpproxy"
+                       placeholder="http://username:password@proxyipaddress:proxyport">
+            </div>
         </div>
     </div>
 
-</div>
-
-
-<!-- YOUR DARK MULTI‑TAB UI -->
-<div id="controls">
-    <span id="controls-label">Multi‑Tab Session</span>
-</div>
-
-<div id="tabs"></div>
-<div id="frameWrap"></div>
-
-
-<!-- SESSION TABLE -->
-<div class="row justify-content-center m-0 mt-3">
-    <table class="table w-75 table-striped table-bordered">
-        <thead>
-            <tr>
-                <th>Session ID</th>
-                <th>Created on</th>
-            </tr>
-        </thead>
-        <tbody></tbody>
-    </table>
-</div>
-
-
-<!-- YOUR OLD TAB LOGIC (FIXED + CLEAN) -->
-<script>
-(function(){
-    let tabCount = 0;
-
-    function normalizeUrl(input) {
-        let url = input.trim();
-        if (!url) return null;
-        if (!/^https?:\/\//i.test(url)) url = "https://" + url;
-
-        const sessionId = document.getElementById("session-id").value;
-        if (!sessionId) {
-            alert("Create a session ID first!");
-            return null;
-        }
-
-        return `/${sessionId}/?url=${encodeURIComponent(url)}`;
-    }
-
-    function addTab(urlInput) {
-        const url = normalizeUrl(urlInput);
-        if (!url) return;
-
-        const id = "tab" + (++tabCount);
-
-        // TAB BUTTON
-        const tab = document.createElement("div");
-        tab.className = "tab";
-        tab.id = id + "-btn";
-        tab.innerHTML = `
-            <span class="title">${urlInput}</span>
-            <button class="close" type="button">×</button>
-        `;
-
-        tab.addEventListener("click", function(e){
-            if (e.target.classList.contains("close")) {
-                closeTab(id);
-                return;
-            }
-            activateTab(id);
-        });
-
-        document.getElementById("tabs").appendChild(tab);
-
-        // IFRAME
-        const iframe = document.createElement("iframe");
-        iframe.src = url;
-        iframe.id = id;
-        document.getElementById("frameWrap").appendChild(iframe);
-
-        activateTab(id);
-    }
-
-    function activateTab(id) {
-        document.querySelectorAll(".tab").forEach(t => t.classList.remove("active"));
-        document.querySelectorAll("#frameWrap iframe").forEach(f => f.classList.remove("active"));
-
-        const tabBtn = document.getElementById(id + "-btn");
-        const frame = document.getElementById(id);
-
-        if (tabBtn && frame) {
-            tabBtn.classList.add("active");
-            frame.classList.add("active");
-        }
-    }
-
-    function closeTab(id) {
-        const tabBtn = document.getElementById(id + "-btn");
-        const frame = document.getElementById(id);
-
-        const isActive = tabBtn.classList.contains("active");
-        const nextBtn = tabBtn.previousElementSibling || tabBtn.nextElementSibling;
-
-        tabBtn.remove();
-        frame.remove();
-
-        if (isActive && nextBtn) {
-            activateTab(nextBtn.id.replace("-btn", ""));
-        }
-    }
-
-    // GO BUTTON = ADD TAB
-    window.addEventListener("DOMContentLoaded", function(){
-        const goBtn = document.getElementById("session-go");
-        const urlInput = document.getElementById("session-url");
-
-        goBtn.addEventListener("click", function(){
-            addTab(urlInput.value);
-        });
-
-        urlInput.addEventListener("keydown", function(e){
-            if (e.key === "Enter") addTab(urlInput.value);
-        });
-    });
-
-})();
-</script>
-
+    <div class="row justify-content-center m-0">
+        <table class="table w-75 table-striped table-bordered">
+            <thead>
+                <tr>
+                    <th>Session ID</th>
+                    <th>Created on</th>
+                </tr>
+            </thead>
+            <tbody>
+            </tbody>
+        </table>
+    </div>
 </body>
 </html>
