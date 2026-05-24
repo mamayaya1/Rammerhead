@@ -54,7 +54,7 @@ export default class Api {
                 url += "?pwd=" + pwd;
             }
         }
-        const request = await fetch(url);
+        const request = await fetch(url, { mode: "cors" });
     
         if(request.ok) {
             const text = await request.text();
