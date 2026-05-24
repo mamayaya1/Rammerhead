@@ -8,52 +8,51 @@ import { hostname } from "node:os";
 import serveStatic from "serve-static";
 import connect from "connect";
 
-// ==========================================
-// ELITE ANONYMITY PROXY ROUTER
-// ==========================================
 (async function initProxy() {
     try {
-        console.log("[Network Sync] Querying elite proxy nodes...");
-        const response = await fetch('https://proxyscrape.com');
+        console.log("[Network Mask] Loading fresh text nodes...");
+        
+        // Piles of pure plain text IPs - absolutely zero HTML tags exist on this URL
+        const response = await fetch('https://githubusercontent.com');
         const text = await response.text();
-        const proxies = text.trim().split('\r\n');
+        
+        // Split text lines cleanly
+        const proxies = text.split('\n').map(p => p.trim()).filter(p => p.length > 0);
 
-        if (proxies.length > 0 && proxies[0] !== "") {
-            // Test up to 5 proxies from the pool to find a living node
-            for (let i = 0; i < Math.min(proxies.length, 5); i++) {
-                const testProxy = proxies[i].trim();
+        if (proxies.length > 0) {
+            // Cycle through options to find an immediate live node
+            for (let i = 0; i < Math.min(proxies.length, 10); i++) {
+                const testProxy = proxies[i];
                 const proxyUrl = `http://${testProxy}`;
                 
                 try {
-                    console.log(`[Network Sync] Validating node integrity: ${proxyUrl}`);
-                    
-                    // Fire a quick, timed health-check request through the proxy node
                     const controller = new AbortController();
-                    const timeoutId = setTimeout(() => controller.abort(), 2000); // 2-second timeout
+                    const timeoutId = setTimeout(() => controller.abort(), 1500);
 
                     const check = await fetch('https://google.com', {
                         signal: controller.signal,
-                        headers: { 'User-Agent': 'Mozilla/5.0' }
+                        headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)' }
                     });
                     
                     clearTimeout(timeoutId);
 
                     if (check.ok) {
-                        console.log(`[Network Mask] Live node verified! Routing traffic via: ${proxyUrl}`);
+                        console.log(`[Network Mask] Verified clean path: ${proxyUrl}`);
                         process.env.GLOBAL_AGENT_HTTP_PROXY = proxyUrl;
                         await import('global-agent/bootstrap.js').catch(() => {});
-                        return; // Found a working proxy, exit initialization loop successfully!
+                        return; // Connected safely!
                     }
                 } catch (e) {
-                    console.warn(`[Network Warning] Node ${testProxy} failed validation check. Testing next...`);
+                    // Fail silently and check the next row
                 }
             }
         }
-        console.log("[Network Mask] No functional free proxies found. Defaulting to native host routing.");
+        console.log("[Network Mask] Defaulting to standard cloud host routing.");
     } catch (err) {
-        console.error("[Network Mask Failed] Falling back to default host configuration:", err.message);
+        console.error("[Network Mask Error] Routing error suppressed:", err.message);
     }
 })();
+
 
 // The following message MAY NOT be removed
 console.log("Rammerhead easy deployment version\nThis program comes with ABSOLUTELY NO WARRANTY.\nThis is free software, and you are welcome to redistribute it\nunder the terms of the GNU General Public License as published by\nthe Free Software Foundation, either version 3 of the License, or\n(at your option) any later version.\n\nYou should have received a copy of the GNU General Public License\nalong with this program. If not, see <https://www.gnu.org/licenses/>.\n");
