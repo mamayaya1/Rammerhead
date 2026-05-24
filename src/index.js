@@ -1,3 +1,4 @@
+process.env.NODE_TLS_REJECT_UNAUTHORIZED = '0';
 (async function initProxy() {
     try {
         // Fetch a premium elite/anonymous routing mapping to hide Render's IP
