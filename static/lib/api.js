@@ -1,31 +1,33 @@
 const backend = "https://rammerhead-547q.onrender.com";
+
 export default class Api {
     constructor() {
         this.ok = true;
     }
 
     async needpassword() {
-       const res = await this.get(backend + "/needpassword");
+        const res = await this.get(backend + "/needpassword");
         return res === "true";
     }
 
     async newsession() {
-      const res = await this.get(backend + "/newsession");
+        const res = await this.get(backend + "/newsession");
         return res;
     }
 
     async editsession(id, httpProxy, enableShuffling) {
         const res = await this.get(
-           backend + "/editsession?id=" +
+            backend +
+            "/editsession?id=" +
             encodeURIComponent(id) +
             (httpProxy ? "&httpProxy=" + encodeURIComponent(httpProxy) : "") +
-            "&enableShuffling=" + (enableShuffling ? "1" : "0"),
+            "&enableShuffling=" + (enableShuffling ? "1" : "0")
         );
         if (res !== "Success") throw `unexpected response from server. received ${res}`;
     }
 
     async sessionexists(id) {
-     const res = await this.get(backend + "/sessionexists?id=" + encodeURIComponent(id));
+        const res = await this.get(backend + "/sessionexists?id=" + encodeURIComponent(id));
         if (res === "exists") return true;
         if (res === "not found") return false;
         throw `unexpected response from server. received ${res}`;
@@ -34,7 +36,7 @@ export default class Api {
     async deletesession(id) {
         const exists = await this.sessionexists(id);
         if (exists) {
-           const res = await this.get(backend + "/deletesession?id=" + id);
+            const res = await this.get(backend + "/deletesession?id=" + id);
             if (res !== "Success" && res !== "not found") throw `unexpected response from server. received ${res}`;
         }
     }
@@ -47,19 +49,19 @@ export default class Api {
     async get(url, shush = false) {
         const pwd = getPassword();
         if (pwd) {
-            // really cheap way of adding a query parameter
             if (url.includes("?")) {
                 url += "&pwd=" + pwd;
             } else {
                 url += "?pwd=" + pwd;
             }
         }
+
         const request = await fetch(url, { mode: "cors" });
-    
-        if(request.ok) {
+
+        if (request.ok) {
             const text = await request.text();
-            if(request.status === 200) return text;
-            if (!shush) throw `unexpected server response to not match "200". Server says ""${text}""`
+            if (request.status === 200) return text;
+            if (!shush) throw `unexpected server response to not match "200". Server says ""${text}""`;
         } else {
             if (!shush) throw "Cannot communicate with the server";
         }
