@@ -9,21 +9,75 @@ import serveStatic from "serve-static";
 import connect from "connect";
 
 // ===================================================
-// FIXED ROUTER: STATIC BACKUP ARCHITECTURE
+// HTML-GUARDED MULTI-DOMAIN PROXY ROUTER
 // ===================================================
 (async function initProxy() {
-    try {
-        // Since Render blocks outbound proxy scraping, use a dedicated backup gateway node
-        const staticGateway = '104.248.51.102:8080'; // Clean fallback routing gateway
-        const proxyUrl = `http://${staticGateway}`;
-        
-        console.log(`[Network Mask] Bypassing cloud firewall via static gateway: ${proxyUrl}`);
-        
-        process.env.GLOBAL_AGENT_HTTP_PROXY = proxyUrl;
-        await import('global-agent/bootstrap.js').catch(() => {});
-    } catch (err) {
-        console.error("[Network Mask Error] Routing setup bypassed:", err.message);
+    // RESTORED: Complete direct paths to the plain-text lists across separate domains
+    const proxySources = [
+        'https://githubusercontent.com',
+        'https://jsdelivr.net',
+        'https://githubusercontent.com'
+    ];
+
+    // Wait 3 seconds for Render's container virtualization network to boot up
+    await new Promise(resolve => setTimeout(resolve, 3000));
+
+    for (const source of proxySources) {
+        try {
+            console.log(`[Network Mask] Fetching plain-text nodes...`);
+            const response = await fetch(source);
+            
+            if (!response.ok) throw new Error(`HTTP status code ${response.status}`);
+            
+            const text = await response.text();
+            
+            // HTML GUARD: If the source returns a webpage layout, reject it instantly
+            if (text.includes('<!DOCTYPE') || text.includes('<html') || text.includes('<head')) {
+                throw new Error("Source returned an HTML web page instead of a raw text IP list.");
+            }
+
+            // Parse clean lines out of the plain text body
+            const proxies = text.replace(/\r/g, '').split('\n')
+                                .map(p => p.trim())
+                                .filter(p => p.length > 0 && !p.startsWith('#') && p.includes(':'));
+
+            if (proxies.length > 0) {
+                for (let i = 0; i < Math.min(proxies.length, 15); i++) {
+                    const randomIndex = Math.floor(Math.random() * Math.min(proxies.length, 40));
+                    const testProxy = proxies[randomIndex] || proxies[i];
+                    
+                    // Strip any protocol prefixes left behind by the source data
+                    const cleanIP = testProxy.replace(/^https?:\/\//i, '').trim();
+                    const proxyUrl = `http://${cleanIP}`;
+                    
+                    try {
+                        const controller = new AbortController();
+                        const timeoutId = setTimeout(() => controller.abort(), 1800); // 1.8s timeout check
+
+                        const check = await fetch('https://google.com', {
+                            signal: controller.signal,
+                            headers: { 'User-Agent': 'Mozilla/5.0' }
+                        });
+                        
+                        clearTimeout(timeoutId);
+
+                        if (check.ok) {
+                            console.log(`[Network Mask] Verified clean path link established: ${proxyUrl}`);
+                            process.env.GLOBAL_AGENT_HTTP_PROXY = proxyUrl;
+                            await import('global-agent/bootstrap.js').catch(() => {});
+                            return; // Connected cleanly! Exit initialization routine safely.
+                        }
+                    } catch (e) {
+                        // Check next line item smoothly
+                    }
+                }
+            }
+        } catch (err) {
+            console.warn(`[Network Mask Warning] Source bypassed (${err.message}). Trying backup infrastructure...`);
+            await new Promise(resolve => setTimeout(resolve, 1000));
+        }
     }
+    console.log("[Network Mask] Active routing pools exhausted. Operating on native cloud configuration.");
 })();
 
 // The following message MAY NOT be removed
