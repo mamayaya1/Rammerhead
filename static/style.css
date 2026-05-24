@@ -1,38 +1,204 @@
 body {
-    background-color: rgb(255, 239, 231);
+    margin: 0;
+    padding: 0;
+    background-color: #1e1f2b;
+    color: #ffffff;
     font-family: Arial, Helvetica, sans-serif;
 }
 
-header {
-    text-align: center;
+/* Main container */
+.container {
+    margin-top: 20px;
 }
 
-header h1 {
-    margin-top: 0;
-    font-weight: bold;
+/* Text */
+p, label, span, th, td {
+    color: #ffffff;
 }
 
-header img {
-    width: 200px;
+/* Input groups */
+.input-group-text {
+    background-color: #2f3242;
+    color: #ffffff;
+    border: 1px solid #444857;
 }
 
-.input-group-text,
+.form-control {
+    background-color: #252736;
+    color: #ffffff;
+    border: 1px solid #444857;
+}
+
+.form-control:focus {
+    background-color: #252736;
+    color: #ffffff;
+    border-color: #68c950;
+    box-shadow: 0 0 0 0.2rem rgba(104, 201, 80, 0.25);
+}
+
 .disable-text {
     cursor: default;
     user-select: none;
 }
 
+/* Buttons */
+.btn {
+    border-radius: 4px;
+    font-weight: 600;
+}
+
+.btn-success,
+.btn-secondary,
+.btn-outline-secondary,
+.btn-outline-primary,
+.btn-outline-danger {
+    border-width: 1px;
+}
+
+.btn-success,
+.btn-secondary {
+    background-color: #68c950;
+    border-color: #68c950;
+    color: #000000;
+}
+
+.btn-success:hover,
+.btn-secondary:hover {
+    background-color: #5ab545;
+    border-color: #5ab545;
+}
+
+.btn-outline-secondary,
+.btn-outline-primary,
+.btn-outline-danger {
+    background-color: transparent;
+    color: #ffffff;
+    border-color: #5a5c6c;
+}
+
+.btn-outline-secondary:hover,
+.btn-outline-primary:hover,
+.btn-outline-danger:hover {
+    background-color: #3a3c4d;
+    border-color: #68c950;
+}
+
+/* Advanced options checkbox */
+.form-check-input {
+    background-color: #252736;
+    border-color: #444857;
+}
+
+.form-check-input:checked {
+    background-color: #68c950;
+    border-color: #68c950;
+}
+
+/* Table */
 table.table-bordered {
-	background-color: inherit !important;
-    border: 1px solid #c1c1c1;
+    background-color: #1f202a !important;
+    border: 1px solid #444857;
 }
 
-table.table-bordered>thead>tr>th {
-	background-color: inherit !important;
-    border: 1px solid #c1c1c1;
+table.table-bordered > thead > tr > th {
+    background-color: #2f3242 !important;
+    border: 1px solid #444857;
+    color: #ffffff;
 }
 
-table.table-bordered>tbody>tr>td {
-	background-color: inherit !important;
-    border: 1px solid #c1c1c1;
+table.table-bordered > tbody > tr > td {
+    background-color: #252736 !important;
+    border: 1px solid #444857;
+    color: #ffffff;
+}
+
+/* Dark multi-tab UI */
+#controls {
+    margin: 0;
+    padding: 10px;
+    background: #2f3242;
+    display: flex;
+    gap: 10px;
+    align-items: center;
+}
+
+#controls-label {
+    font-weight: 600;
+    color: #ffffff;
+}
+
+#addTabBtn {
+    padding: 8px 12px;
+    background: #68c950;
+    color: #000;
+    font-weight: bold;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+}
+
+#addTabBtn:hover {
+    background: #5ab545;
+}
+
+#tabs {
+    display: flex;
+    background: #1f202a;
+    overflow-x: auto;
+    white-space: nowrap;
+    padding: 6px;
+    gap: 4px;
+}
+
+.tab {
+    padding: 6px 10px;
+    background: #3a3c4d;
+    cursor: pointer;
+    border-top-left-radius: 6px;
+    border-top-right-radius: 6px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    max-width: 30vw;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    color: #ffffff;
+}
+
+.tab.active {
+    background: #68c950;
+    color: #000000;
+}
+
+.tab .title {
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.tab .close {
+    background: transparent;
+    color: inherit;
+    border: none;
+    font-weight: bold;
+    cursor: pointer;
+}
+
+/* Iframe area */
+#frameWrap {
+    flex-grow: 1;
+    position: relative;
+    height: 70vh;
+    background: #000000;
+}
+
+#frameWrap iframe {
+    width: 100%;
+    height: 100%;
+    border: none;
+    display: none;
+    background: #000000;
+}
+
+#frameWrap iframe.active {
+    display: block;
 }
