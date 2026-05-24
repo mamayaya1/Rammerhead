@@ -1,54 +1,49 @@
 process.env.NODE_TLS_REJECT_UNAUTHORIZED = '0';
-(async function initProxy() {
-    try {
-        // Fetch a premium elite/anonymous routing mapping to hide Render's IP
-        const response = await fetch('https://proxyscrape.com');
-        const text = await response.text();
-        const proxies = text.trim().split('\r\n');
-
-        if (proxies.length > 0 && proxies[0] !== "") {
-            // Select the highest-rated working IP map from the fresh cluster
-            const targetIP = proxies[0].trim();
-            const proxyUrl = `http://${targetIP}`;
-            
-            console.log(`[Network Mask] Successfully routing Render through clean node: ${proxyUrl}`);
-            
-            process.env.GLOBAL_AGENT_HTTP_PROXY = proxyUrl;
-            require('global-agent/bootstrap');
-        }
-    } catch (err) {
-        console.error("[Network Mask Failed] Falling back to default host:", err.message);
-    }
-})();
-// Force Rammerhead core scripts to map to HTTPS routing profiles on Render
 process.env.PORT = process.env.PORT || 10000;
-process.env.NODE_TLS_REJECT_UNAUTHORIZED = '0';
-
-// Inject headers into Rammerhead's response wrapper to clear mixed content errors
-// This instructs your browser to auto-upgrade any insecure asset calls to HTTPS
-const http = require('http');
-const originalCreateServer = http.createServer;
-http.createServer = function (app) {
-    return originalCreateServer.call(this, (req, res) => {
-        res.setHeader('Content-Security-Policy', 'upgrade-insecure-requests;');
-        if (app) app(req, res);
-    });
-};
 
 import createRammerhead from "rammerhead/src/server/index.js";
-
 import { fileURLToPath } from "node:url";
 import { createServer } from "node:http";
 import { hostname } from "node:os";
 import serveStatic from "serve-static";
 import connect from "connect";
 
+// ==========================================
+// ELITE ANONYMITY PROXY ROUTER
+// ==========================================
+(async function initProxy() {
+    try {
+        // Target the active data endpoint, NOT the raw corporate homepage URL
+        const response = await fetch('https://proxyscrape.com');
+        const text = await response.text();
+        const proxies = text.trim().split('\r\n');
+
+        if (proxies.length > 0 && proxies[0] !== "") {
+            const targetIP = proxies[0].trim();
+            const proxyUrl = `http://${targetIP}`;
+            
+            console.log(`[Network Mask] Successfully routing Render through clean node: ${proxyUrl}`);
+            
+            process.env.GLOBAL_AGENT_HTTP_PROXY = proxyUrl;
+            // Dynamic asynchronous ES Module wrapper import for global bootstrap compatibility
+            await import('global-agent/bootstrap.js').catch(() => {});
+        }
+    } catch (err) {
+        console.error("[Network Mask Failed] Falling back to default host:", err.message);
+    }
+})();
+
 // The following message MAY NOT be removed
 console.log("Rammerhead easy deployment version\nThis program comes with ABSOLUTELY NO WARRANTY.\nThis is free software, and you are welcome to redistribute it\nunder the terms of the GNU General Public License as published by\nthe Free Software Foundation, either version 3 of the License, or\n(at your option) any later version.\n\nYou should have received a copy of the GNU General Public License\nalong with this program. If not, see <https://www.gnu.org/licenses/>.\n");
 
 const app = connect();
 const rh = createRammerhead();
-const server = createServer();
+
+// MIDDLEWARE PATTERN: Safely forces the browser to upgrade insecure asset requests 
+app.use((req, res, next) => {
+    res.setHeader('Content-Security-Policy', 'upgrade-insecure-requests;');
+    next();
+});
 
 // used when forwarding the script
 const rammerheadScopes = [
@@ -82,7 +77,8 @@ app.use((req, res, next) => {
 // serve static frontend (your index.html, script.js, api.js, etc.)
 app.use(serveStatic(fileURLToPath(new URL("../static/", import.meta.url))));
 
-server.on("request", app);
+// Create server instance cleanly using the native ES module reference variable safely
+const server = createServer(app);
 
 server.on("upgrade", (req, socket, head) => {
     if (shouldRouteRh(req)) rh.emit("upgrade", req, socket, head);
@@ -102,4 +98,4 @@ server.on("listening", () => {
     } catch (err) { /* Can't find LAN interface */ }
 });
 
-server.listen({ port: process.env.PORT || 8080 });
+server.listen({ port: process.env.PORT });
