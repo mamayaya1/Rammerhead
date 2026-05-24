@@ -13,23 +13,45 @@ import connect from "connect";
 // ==========================================
 (async function initProxy() {
     try {
-        // Target the active data endpoint, NOT the raw corporate homepage URL
+        console.log("[Network Sync] Querying elite proxy nodes...");
         const response = await fetch('https://proxyscrape.com');
         const text = await response.text();
         const proxies = text.trim().split('\r\n');
 
         if (proxies.length > 0 && proxies[0] !== "") {
-            const targetIP = proxies[0].trim();
-            const proxyUrl = `http://${targetIP}`;
-            
-            console.log(`[Network Mask] Successfully routing Render through clean node: ${proxyUrl}`);
-            
-            process.env.GLOBAL_AGENT_HTTP_PROXY = proxyUrl;
-            // Dynamic asynchronous ES Module wrapper import for global bootstrap compatibility
-            await import('global-agent/bootstrap.js').catch(() => {});
+            // Test up to 5 proxies from the pool to find a living node
+            for (let i = 0; i < Math.min(proxies.length, 5); i++) {
+                const testProxy = proxies[i].trim();
+                const proxyUrl = `http://${testProxy}`;
+                
+                try {
+                    console.log(`[Network Sync] Validating node integrity: ${proxyUrl}`);
+                    
+                    // Fire a quick, timed health-check request through the proxy node
+                    const controller = new AbortController();
+                    const timeoutId = setTimeout(() => controller.abort(), 2000); // 2-second timeout
+
+                    const check = await fetch('https://google.com', {
+                        signal: controller.signal,
+                        headers: { 'User-Agent': 'Mozilla/5.0' }
+                    });
+                    
+                    clearTimeout(timeoutId);
+
+                    if (check.ok) {
+                        console.log(`[Network Mask] Live node verified! Routing traffic via: ${proxyUrl}`);
+                        process.env.GLOBAL_AGENT_HTTP_PROXY = proxyUrl;
+                        await import('global-agent/bootstrap.js').catch(() => {});
+                        return; // Found a working proxy, exit initialization loop successfully!
+                    }
+                } catch (e) {
+                    console.warn(`[Network Warning] Node ${testProxy} failed validation check. Testing next...`);
+                }
+            }
         }
+        console.log("[Network Mask] No functional free proxies found. Defaulting to native host routing.");
     } catch (err) {
-        console.error("[Network Mask Failed] Falling back to default host:", err.message);
+        console.error("[Network Mask Failed] Falling back to default host configuration:", err.message);
     }
 })();
 
