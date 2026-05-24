@@ -84,19 +84,24 @@ import connect from "connect";
 console.log("Rammerhead easy deployment version\nThis program comes with ABSOLUTELY NO WARRANTY.\nThis is free software, and you are welcome to redistribute it\nunder the terms of the GNU General Public License as published by\nthe Free Software Foundation, either version 3 of the License, or\n(at your option) any later version.\n\nYou should have received a copy of the GNU General Public License\nalong with this program. If not, see <https://www.gnu.org/licenses/>.\n");
 
 const app = connect();
+// Replace your previous createRammerhead block with this strict version:
 const rh = createRammerhead({
-    // Forces the internal asset manager to match Render's public SSL protocol
+    // Strictly rewritten path configuration logic
     getProxyUrl: (req, url) => {
         return url;
     },
     getServerInfo: (req) => {
+        // Fallback safety net to capture Render's public host headers dynamically
+        const currentHost = req.headers.host || 'rammerhead-w7hm.onrender.com';
+        
         return {
-            hostname: req.headers.host,
-            port: 443, // Force asset path rewrites to map to standard secure port
-            secure: true // Explicitly forces 'https://' generation for transport-worker.js
+            hostname: currentHost.replace(/^https?:\/\//i, ''), // Strip explicit schema elements if present
+            port: 443,
+            secure: true // Absolute enforcement of secure HTTPS worker script generation
         };
     }
 });
+
 
 // MIDDLEWARE PATTERN: Safely forces the browser to upgrade insecure asset requests 
 app.use((req, res, next) => {
