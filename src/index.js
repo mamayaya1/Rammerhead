@@ -9,50 +9,64 @@ import serveStatic from "serve-static";
 import connect from "connect";
 
 (async function initProxy() {
-    try {
-        console.log("[Network Mask] Loading fresh text nodes...");
-        
-        // Piles of pure plain text IPs - absolutely zero HTML tags exist on this URL
-        const response = await fetch('https://githubusercontent.com');
-        const text = await response.text();
-        
-        // Split text lines cleanly
-        const proxies = text.split('\n').map(p => p.trim()).filter(p => p.length > 0);
+    // List of highly reliable plain-text proxy repositories
+    const proxySources = [
+        'https://githubusercontent.com',
+        'https://cdn.jsdelivr.net/gh/proxifly/free-proxy-list@main/proxies/protocols/http/data.txt',
+        'https://proxyscrape.com'
+    ];
 
-        if (proxies.length > 0) {
-            // Cycle through options to find an immediate live node
-            for (let i = 0; i < Math.min(proxies.length, 10); i++) {
-                const testProxy = proxies[i];
-                const proxyUrl = `http://${testProxy}`;
-                
-                try {
-                    const controller = new AbortController();
-                    const timeoutId = setTimeout(() => controller.abort(), 1500);
+    // Give Render's container 3 seconds to fully bring the network online before fetching
+    await new Promise(resolve => setTimeout(resolve, 3000));
 
-                    const check = await fetch('https://google.com', {
-                        signal: controller.signal,
-                        headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)' }
-                    });
+    for (const source of proxySources) {
+        try {
+            console.log(`[Network Mask] Attempting to fetch nodes from source...`);
+            const response = await fetch(source);
+            
+            if (!response.ok) throw new Error(`HTTP status ${response.status}`);
+            
+            const text = await response.text();
+            const proxies = text.split('\n').map(p => p.trim()).filter(p => p.length > 0 && !p.startsWith('#'));
+
+            if (proxies.length > 0) {
+                // Test up to 15 proxies from the active list to find a living gateway
+                for (let i = 0; i < Math.min(proxies.length, 15); i++) {
+                    // Randomize index slightly so we don't always hit the same dead ones
+                    const randomIndex = Math.floor(Math.random() * Math.min(proxies.length, 30));
+                    const testProxy = proxies[randomIndex] || proxies[i];
+                    const proxyUrl = `http://${testProxy.trim()}`;
                     
-                    clearTimeout(timeoutId);
+                    try {
+                        const controller = new AbortController();
+                        const timeoutId = setTimeout(() => controller.abort(), 1800);
 
-                    if (check.ok) {
-                        console.log(`[Network Mask] Verified clean path: ${proxyUrl}`);
-                        process.env.GLOBAL_AGENT_HTTP_PROXY = proxyUrl;
-                        await import('global-agent/bootstrap.js').catch(() => {});
-                        return; // Connected safely!
+                        const check = await fetch('https://google.com', {
+                            signal: controller.signal,
+                            headers: { 'User-Agent': 'Mozilla/5.0' }
+                        });
+                        
+                        clearTimeout(timeoutId);
+
+                        if (check.ok) {
+                            console.log(`[Network Mask] Verified clean path link established: ${proxyUrl}`);
+                            process.env.GLOBAL_AGENT_HTTP_PROXY = proxyUrl;
+                            await import('global-agent/bootstrap.js').catch(() => {});
+                            return; // Success! Exit initialization loop completely
+                        }
+                    } catch (e) {
+                        // Move to next individual proxy line
                     }
-                } catch (e) {
-                    // Fail silently and check the next row
                 }
             }
+        } catch (err) {
+            console.warn(`[Network Mask Warning] Source failed (${err.message}). Trying backup source...`);
+            // Brief pause before trying the next backup URL repository link
+            await new Promise(resolve => setTimeout(resolve, 1500));
         }
-        console.log("[Network Mask] Defaulting to standard cloud host routing.");
-    } catch (err) {
-        console.error("[Network Mask Error] Routing error suppressed:", err.message);
     }
+    console.log("[Network Mask] All backup systems exhausted. Operating on native cloud interface.");
 })();
-
 
 // The following message MAY NOT be removed
 console.log("Rammerhead easy deployment version\nThis program comes with ABSOLUTELY NO WARRANTY.\nThis is free software, and you are welcome to redistribute it\nunder the terms of the GNU General Public License as published by\nthe Free Software Foundation, either version 3 of the License, or\n(at your option) any later version.\n\nYou should have received a copy of the GNU General Public License\nalong with this program. If not, see <https://www.gnu.org/licenses/>.\n");
