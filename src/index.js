@@ -1,11 +1,9 @@
 import createRammerhead from "rammerhead/src/server/index.js";
 import { fileURLToPath } from "node:url";
 import { createServer } from "node:http";
-import { hostname } from "node:os";
+import { hostname, networkInterfaces } from "node:os"; // Added networkInterfaces
 import serveStatic from "serve-static";
 import connect from "connect";
-
-
 
 // The following message MAY NOT be removed
 console.log("Rammerhead easy deployment version\nThis program comes with ABSOLUTELY NO WARRANTY.\nThis is free software, and you are welcome to redistribute it\nunder the terms of the GNU General Public License as published by\nthe Free Software Foundation, either version 3 of the License, or\n(at your option) any later version.\n\nYou should have received a copy of the GNU General Public License\nalong with this program. If not, see <https://www.gnu.org/licenses/>.\n");
@@ -55,16 +53,36 @@ server.on("upgrade", (req, socket, head) => {
 
 server.on("listening", () => {
     const addr = server.address();
+    
+    // Dynamically look up your real numeric IPv4 Address (e.g. 192.168.1.15)
+    let networkIP = hostname();
+    const interfaces = networkInterfaces();
+    for (const name of Object.keys(interfaces)) {
+        for (const net of interfaces[name]) {
+            if (net.family === 'IPv4' && !net.internal) {
+                networkIP = net.address;
+                break;
+            }
+        }
+    }
+
+    const portSuffix = addr.port === 80 ? "" : ":" + addr.port;
 
     console.log(`Server running on port ${addr.port}`);
     console.log("");
     console.log("You can now view it in your browser.");
-    console.log(`Local: http://${addr.family === "IPv6" ? `[${addr.address}]` : addr.address}${addr.port === 80 ? "" : ":" + addr.port}`);
-    console.log(`Local: http://localhost${addr.port === 80 ? "" : ":" + addr.port}`);
+    
+    // Cleaned Up: No brackets around local loopback structures
+    console.log(`Local: http://127.0.0.1${portSuffix}`);
+    console.log(`Local: http://localhost${portSuffix}`);
     try {
-        console.log(`On Your Network: http://${hostname()}${addr.port === 80 ? "" : ":" + addr.port}`);
+        // Cleaned Up: Will print your numeric IP so iPhone paths map correctly
+        console.log(`On Your Network: http://${networkIP}${portSuffix}`);
     } catch (err) { /* Can't find LAN interface */ }
 });
 
-
-server.listen({ port: process.env.PORT || 8080 });
+// FIXED: Added host: "0.0.0.0" to open up sockets to your local Wi-Fi router network
+server.listen({ 
+    port: process.env.PORT || 8080,
+    host: "0.0.0.0" 
+});
