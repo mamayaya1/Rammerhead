@@ -65,8 +65,11 @@ window.addEventListener('error', setError);
             fillInBtn.className = 'btn btn-outline-primary';
             fillInBtn.onclick = index(i, function (idx) {
                 setError();
-                sessionIdsStore.setDefault(data[idx].id);
-                loadSettings(data[idx]);
+                // OPTION B: Validate index exists before reading id
+                if (data && data[idx]) {
+                    sessionIdsStore.setDefault(data[idx].id);
+                    loadSettings(data[idx]);
+                }
             });
             appendIntoTr(fillInBtn, tr);
 
@@ -75,11 +78,14 @@ window.addEventListener('error', setError);
             deleteBtn.className = 'btn btn-outline-danger';
             deleteBtn.onclick = index(i, function (idx) {
                 setError();
-                api.deletesession(data[idx].id).then(() => {
-                    data.splice(idx, 1);
-                    sessionIdsStore.set(data);
-                    renderSessionTable(data);
-                });
+                // OPTION B: Validate index exists before deleting session
+                if (data && data[idx]) {
+                    api.deletesession(data[idx].id).then(() => {
+                        data.splice(idx, 1);
+                        sessionIdsStore.set(data);
+                        renderSessionTable(data);
+                    });
+                }
             });
             appendIntoTr(deleteBtn, tr);
 
