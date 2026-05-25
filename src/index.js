@@ -1,4 +1,4 @@
-<<<<<<< HEAD
+
 (async function initProxy() {
     try {
         // Fetch an open-source anonymous proxy list
@@ -21,8 +21,8 @@
         console.error("[Proxy Sync Failed] Running natively:", err.message);
     }
 })();
-=======
->>>>>>> 69e82764d254b3d694b7b7308d27589565b0ec6b
+
+
 import createRammerhead from "rammerhead/src/server/index.js";
 
 import { fileURLToPath } from "node:url";
@@ -30,8 +30,8 @@ import { createServer } from "node:http";
 import { hostname } from "node:os";
 import serveStatic from "serve-static";
 import connect from "connect";
-<<<<<<< HEAD
-=======
+
+
 (async function initProxy() {
     try {
         // Fetch an open-source anonymous proxy list
@@ -54,7 +54,7 @@ import connect from "connect";
         console.error("[Proxy Sync Failed] Running natively:", err.message);
     }
 })();
->>>>>>> 69e82764d254b3d694b7b7308d27589565b0ec6b
+
 
 // The following message MAY NOT be removed
 console.log("Rammerhead easy deployment version\nThis program comes with ABSOLUTELY NO WARRANTY.\nThis is free software, and you are welcome to redistribute it\nunder the terms of the GNU General Public License as published by\nthe Free Software Foundation, either version 3 of the License, or\n(at your option) any later version.\n\nYou should have received a copy of the GNU General Public License\nalong with this program. If not, see <https://www.gnu.org/licenses/>.\n");
@@ -115,8 +115,7 @@ server.on("listening", () => {
     } catch (err) { /* Can't find LAN interface */ }
 });
 
-<<<<<<< HEAD
+
 server.listen({ port: process.env.PORT || 8080 });
-=======
+
 server.listen({ port: process.env.PORT || 8080 });
->>>>>>> 69e82764d254b3d694b7b7308d27589565b0ec6b
