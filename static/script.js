@@ -1,5 +1,39 @@
+// 1. ALL IMPORTS MUST BE AT THE ABSOLUTE TOP OF THE FILE
 import StrShuffler from './lib/StrShuffler.js';
 import Api from './lib/api.js';
+
+// 2. POLYFILL RUNS DIRECTLY AFTER IMPORTS
+// 
+(function() {
+  const patchObject = (obj) => {
+    if (!obj) return;
+    try {
+      if (!obj.hasOwnProperty('addChangeEventListener') && !obj.addChangeEventListener) {
+        Object.defineProperty(obj, 'addChangeEventListener', {
+          value: function(f) { 
+            if (!this._evs) this._evs = [];
+            if (!this._evs.includes(f)) this._evs.push(f); 
+          },
+          writable: true, enumerable: false, configurable: true
+        });
+      }
+      if (!obj.hasOwnProperty('removeChangeEventListener') && !obj.removeChangeEventListener) {
+        Object.defineProperty(obj, 'removeChangeEventListener', {
+          value: function(f) { 
+            if (this._evs) this._evs = this._evs.filter(x => x !== f); 
+          },
+          writable: true, enumerable: false, configurable: true
+        });
+      }
+    } catch(e) {}
+  };
+
+  patchObject(Object.prototype);
+  patchObject(EventTarget.prototype);
+  if (typeof Node !== 'undefined') patchObject(Node.prototype);
+  if (typeof Element !== 'undefined') patchObject(Element.prototype);
+  patchObject(window);
+})();
 
 function setError(err) {
     var element = document.getElementById('error-text');
@@ -65,7 +99,6 @@ window.addEventListener('error', setError);
             fillInBtn.className = 'btn btn-outline-primary';
             fillInBtn.onclick = index(i, function (idx) {
                 setError();
-                // OPTION B: Validate index exists before reading id
                 if (data && data[idx]) {
                     sessionIdsStore.setDefault(data[idx].id);
                     loadSettings(data[idx]);
@@ -78,7 +111,6 @@ window.addEventListener('error', setError);
             deleteBtn.className = 'btn btn-outline-danger';
             deleteBtn.onclick = index(i, function (idx) {
                 setError();
-                // OPTION B: Validate index exists before deleting session
                 if (data && data[idx]) {
                     api.deletesession(data[idx].id).then(() => {
                         data.splice(idx, 1);
@@ -141,10 +173,36 @@ window.addEventListener('error', setError);
     }
 
     api.get('/mainport').then((data) => {
+        // Adaptive port logic:
+        // - On reverse-proxy hosts (Render, ngrok, Railway, etc.) the browser
+        //   always hits port 443/80 via the proxy, so window.location.port is
+        //   empty. Switching it would break the app — skip redirect.
+        // - On direct/local hosts (localhost, LAN) window.location.port will
+        //   be set (e.g. "8080"), so redirect to the correct port if needed.
+        var isReverseProxy = (
+            !window.location.port ||                                  // default port = proxy host
+            window.location.hostname.includes('ngrok') ||            // any ngrok domain
+            window.location.hostname.includes('onrender.com') ||     // Render
+            window.location.hostname.includes('railway.app') ||      // Railway
+            window.location.hostname.includes('up.railway.app') ||   // Railway alt
+            window.location.hostname.includes('herokuapp.com') ||    // Heroku
+            window.location.hostname.includes('vercel.app') ||       // Vercel
+            window.location.hostname.includes('fly.dev')             // Fly.io
+        );
+
+        if (isReverseProxy) {
+            console.log('[RH] Reverse-proxy host detected — port switching bypassed.');
+            return;
+        }
+
+        // Direct host: redirect to the correct port if it differs
         var defaultPort = window.location.protocol === 'https:' ? 443 : 80;
-        var currentPort = window.location.port || defaultPort;
-        var mainPort = data || defaultPort;
-        if (currentPort != mainPort) window.location.port = mainPort;
+        var currentPort = parseInt(window.location.port) || defaultPort;
+        var mainPort = parseInt(data) || defaultPort;
+        if (currentPort !== mainPort) {
+            console.log('[RH] Redirecting to port ' + mainPort);
+            window.location.port = mainPort;
+        }
     });
 
     api.needpassword().then(doNeed => {
@@ -174,30 +232,42 @@ window.addEventListener('error', setError);
             setError();
             const id = document.getElementById('session-id').value;
             const httpproxy = document.getElementById('session-httpproxy').value;
+            
             const enableShuffling = document.getElementById('session-shuffling').checked;
-            const url = document.getElementById('session-url').value || 'https://www.google.com/';
+            let url = document.getElementById('session-url').value;
 
-            if (!id) return setError('Must generate a session id first');
+            if (!id) return setError('Must select or create a session first');
+            if (!url) return setError('Must provide a URL to go to');
 
-            const value = await api.sessionexists(id);
-            if (!value) return setError('Session does not exist. Try deleting or generating a new session');
+            if (!url.startsWith('http://') && !url.startsWith('https://')) {
+                url = 'http://' + url;
+            }
 
-            await api.editsession(id, httpproxy, enableShuffling);
-            editSession(id, httpproxy, enableShuffling);
+            try {
+                // Ensure the ID is clean and stripped of accidental whitespace
+                const cleanId = id.trim();
 
-            const shuffleDict = await api.shuffleDict(id);
-            if (!shuffleDict) {
-                window.location.href = '/' + id + '/' + url;
-            } else {
-                var shuffler = new StrShuffler(shuffleDict);
-                window.location.href = '/' + id + '/' + shuffler.shuffle(url);
+                await api.editsession(cleanId, httpproxy, enableShuffling);
+                editSession(cleanId, httpproxy, enableShuffling);
+
+                if (enableShuffling) {
+                    const shuffleDictStr = await api.get('/api/shuffleDict?id=' + cleanId);
+                    const shuffleDict = JSON.parse(shuffleDictStr);
+                    const shuffler = new StrShuffler(shuffleDict);
+                    
+                    const shuffledUrl = shuffler.shuffle(url);
+                    window.location.href = '/' + cleanId + '/' + shuffledUrl;
+                } else {
+                    window.location.href = '/' + cleanId + '/' + url;
+                }
+            } catch (err) {
+                setError(err.message || err);
             }
         }
 
         document.getElementById('session-go').onclick = go;
-
-        document.getElementById('session-url').addEventListener('keydown', (event) => {
-            if (event.key === 'Enter') go();
-        });
+        document.getElementById('session-url').onkeydown = function (e) {
+            if (e.key === 'Enter') go();
+        };
     });
 })();
