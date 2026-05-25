@@ -3,7 +3,6 @@ import { createServer } from "node:http";
 import { fileURLToPath } from "node:url";
 import createRammerhead from "rammerhead/src/server/index.js";
 import serveStatic from "serve-static";
-import ngrok from 'ngrok';
 
 // 2. ENVIRONMENT CONFIGURATIONS
 process.env.PORT = process.env.PORT || 8080;
@@ -341,24 +340,9 @@ server.on("upgrade", (req, socket, head) => {
   }
 });
 
-server.on("listening", async () => {
+server.on("listening", () => {
   const addr = server.address();
-  console.log(`Server running on port ${addr.port}`);
-  try {
-    const url = await ngrok.connect({
-      proto: 'http', addr: addr.port, host_header: 'rewrite', schemes: ['https']
-    });
-    console.log(`🚀 Public Internet URL: ${url}`);
-  } catch (err) {
-    try {
-      const fallbackUrl = await ngrok.connect({ proto: 'http', addr: addr.port });
-      console.log("\n=============================================");
-      console.log(`🚀 Public Internet URL (Fallback): ${fallbackUrl}`);
-      console.log("=============================================\n");
-    } catch (e) {
-      console.error("⚠ Fallback tunnel failed:", e.message);
-    }
-  }
+  console.log(`🚀 Server running on port ${addr.port}`);
 });
 
 server.listen({ port: process.env.PORT });
