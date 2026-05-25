@@ -1,6 +1,4 @@
-
 import createRammerhead from "rammerhead/src/server/index.js";
-
 import { fileURLToPath } from "node:url";
 import { createServer } from "node:http";
 import { hostname } from "node:os";
