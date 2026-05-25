@@ -20,5 +20,8 @@
     "connect": "^3.7.0",
     "rammerhead": "https://github.com/holy-unblocker/rammerhead/releases/download/v1.2.41-holy.5/rammerhead-1.2.41-holy.5.tgz",
     "serve-static": "^1.15.0"
-  }
+  },
+  "main": "index.js",
+  "devDependencies": {},
+  "keywords": []
 }
