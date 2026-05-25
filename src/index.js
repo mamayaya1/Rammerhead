@@ -8,29 +8,6 @@ import serveStatic from "serve-static";
 import connect from "connect";
 
 
-(async function initProxy() {
-    try {
-        // Fetch an open-source anonymous proxy list
-        const response = await fetch('https://githubusercontent.com');
-        const text = await response.text();
-        const proxies = text.trim().split('\n');
-
-        if (proxies.length > 0) {
-            // Select a random fresh public IP mapping
-            const randomProxy = proxies[Math.floor(Math.random() * proxies.length)].trim();
-            const proxyUrl = `http://${randomProxy}`;
-            
-            console.log(`[Proxy Sync] Route active via: ${proxyUrl}`);
-            
-            // Set variables and initialize network routing
-            process.env.GLOBAL_AGENT_HTTP_PROXY = proxyUrl;
-            require('global-agent/bootstrap');
-        }
-    } catch (err) {
-        console.error("[Proxy Sync Failed] Running natively:", err.message);
-    }
-})();
-
 
 // The following message MAY NOT be removed
 console.log("Rammerhead easy deployment version\nThis program comes with ABSOLUTELY NO WARRANTY.\nThis is free software, and you are welcome to redistribute it\nunder the terms of the GNU General Public License as published by\nthe Free Software Foundation, either version 3 of the License, or\n(at your option) any later version.\n\nYou should have received a copy of the GNU General Public License\nalong with this program. If not, see <https://www.gnu.org/licenses/>.\n");
