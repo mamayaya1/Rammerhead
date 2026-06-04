@@ -173,12 +173,6 @@ window.addEventListener('error', setError);
     }
 
     api.get('/mainport').then((data) => {
-        // Adaptive port logic:
-        // - On reverse-proxy hosts (Render, ngrok, Railway, etc.) the browser
-        //   always hits port 443/80 via the proxy, so window.location.port is
-        //   empty. Switching it would break the app — skip redirect.
-        // - On direct/local hosts (localhost, LAN) window.location.port will
-        //   be set (e.g. "8080"), so redirect to the correct port if needed.
         var isReverseProxy = (
             !window.location.port ||                                  // default port = proxy host
             window.location.hostname.includes('ngrok') ||            // any ngrok domain
@@ -187,15 +181,15 @@ window.addEventListener('error', setError);
             window.location.hostname.includes('up.railway.app') ||   // Railway alt
             window.location.hostname.includes('herokuapp.com') ||    // Heroku
             window.location.hostname.includes('vercel.app') ||       // Vercel
-            window.location.hostname.includes('fly.dev')             // Fly.io
+            window.location.hostname.includes('fly.dev') ||          // Fly.io
+            window.location.hostname.includes('pages.dev') ||        // Cloudflare Pages
+            window.location.hostname.includes('workers.dev') ||      // Cloudflare Workers
+            window.location.hostname.includes('trycloudflare.com')   // Cloudflare Tunnel
         );
-
         if (isReverseProxy) {
             console.log('[RH] Reverse-proxy host detected — port switching bypassed.');
             return;
         }
-
-        // Direct host: redirect to the correct port if it differs
         var defaultPort = window.location.protocol === 'https:' ? 443 : 80;
         var currentPort = parseInt(window.location.port) || defaultPort;
         var mainPort = parseInt(data) || defaultPort;
