@@ -3,10 +3,11 @@ import { createServer } from "node:http";
 import { fileURLToPath } from "node:url";
 import createRammerhead from "rammerhead/src/server/index.js";
 import serveStatic from "serve-static";
+import ngrok from 'ngrok';
 
 // 2. ENVIRONMENT CONFIGURATIONS
+// Use PORT from environment (Render/HuggingFace inject this), fallback to 8080 locally
 process.env.PORT = process.env.PORT || 8080;
-process.env.NODE_TLS_REJECT_UNAUTHORIZED = '0';
 
 const serveStaticFiles = serveStatic(fileURLToPath(new URL("../static/", import.meta.url)));
 
@@ -14,12 +15,12 @@ const serveStaticFiles = serveStatic(fileURLToPath(new URL("../static/", import.
 const rh = createRammerhead({
   getProxyInfo: (req) => {
     const hostHeader = req.headers['x-forwarded-host'] || req.headers['host'] || 'localhost';
-    const cleanHost = hostHeader.split(':')[0];
+    const cleanHost = hostHeader.split(',')[0].trim().split(':')[0];
     return { protocol: 'https:', hostname: cleanHost, port: 443 };
   },
   getServerInfo: (req) => {
     const hostHeader = req.headers['x-forwarded-host'] || req.headers['host'] || 'localhost';
-    const cleanHost = hostHeader.split(':')[0];
+    const cleanHost = hostHeader.split(',')[0].trim().split(':')[0];
     return { hostname: cleanHost, port: 443, crossDomainPort: null, crossProtoRedirect: true, protocol: 'https:' };
   }
 });
@@ -35,30 +36,37 @@ const rammerheadScopes = [
 function shouldRouteRh(req) {
   const url = new URL(req.url, 'http://' + (req.headers['host'] || 'localhost'));
   if (rammerheadScopes.includes(url.pathname)) return true;
-  // Strip Rammerhead encoding suffixes like !s!utf-8, !i, !js before testing 32-char hex
+  // Strip Rammerhead encoding suffixes (!s!utf-8, !i, !js) before testing 32-char hex session ID
   const firstSegment = url.pathname.split('/')[1] || '';
   const sessionId = firstSegment.split('!')[0];
   return /^[a-z0-9]{32}$/i.test(sessionId);
 }
 
+// Helper: force socket.encrypted = true using defineProperty
+// Assignment (req.socket.encrypted = true) silently does nothing in Node 18+
+// because it is a read-only getter on net.Socket.
+function forceEncrypted(obj) {
+  if (!obj) return;
+  try {
+    Object.defineProperty(obj, 'encrypted', {
+      get: () => true,
+      configurable: true
+    });
+  } catch(e) {}
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
-// EARLY PATCH SCRIPT
-// Served at /rh-early-patch.js — must be loaded BEFORE hammerhead.js and
-// BEFORE iframe-task.js in your HTML. It patches Object.prototype so
-// addChangeEventListener exists before any Rammerhead script evaluates.
-//
-// Add to your static/index.html:
-//   <script src="/rh-early-patch.js"></script>   ← NEW, must be first
+// EARLY PATCH SCRIPT — served at /rh-early-patch.js
+// Must be loaded BEFORE hammerhead.js in your static/index.html:
+//   <script src="/rh-early-patch.js"></script>
 //   <script src="/hammerhead.js"></script>
 // ─────────────────────────────────────────────────────────────────────────────
 const EARLY_PATCH_SCRIPT = `
 (function() {
   'use strict';
 
-  // ── 1. addChangeEventListener on Object.prototype ──────────────────────────
+  // 1. addChangeEventListener on Object.prototype
   // Fixes: "n.addChangeEventListener is not a function" in rammerhead.js:60
-  // This fires in BOTH the main window AND inside iframes (iframe-task.js),
-  // because Object.prototype is inherited everywhere.
   function attachCEL(obj) {
     if (!obj || typeof obj.addChangeEventListener === 'function') return;
     try {
@@ -79,11 +87,10 @@ const EARLY_PATCH_SCRIPT = `
       });
     } catch(e) {}
   }
-
   attachCEL(Object.prototype);
   if (typeof Storage !== 'undefined') attachCEL(Storage.prototype);
 
-  // ── 2. Keep the method alive on any Proxy Rammerhead creates ───────────────
+  // 2. Keep addChangeEventListener alive on any Proxy Rammerhead creates
   try {
     var _NP = window.Proxy;
     window.Proxy = new _NP(_NP, {
@@ -92,12 +99,8 @@ const EARLY_PATCH_SCRIPT = `
         if (handler) {
           var _og = handler.get;
           handler.get = function(t, prop, recv) {
-            if (prop === 'addChangeEventListener') {
-              return function(fn) { (t.__rhEvs = t.__rhEvs || []).push(fn); };
-            }
-            if (prop === 'removeChangeEventListener') {
-              return function(fn) { if (t.__rhEvs) t.__rhEvs = t.__rhEvs.filter(function(f){ return f!==fn; }); };
-            }
+            if (prop === 'addChangeEventListener') return function(fn) { (t.__rhEvs = t.__rhEvs || []).push(fn); };
+            if (prop === 'removeChangeEventListener') return function(fn) { if (t.__rhEvs) t.__rhEvs = t.__rhEvs.filter(function(f){ return f!==fn; }); };
             return _og ? _og.apply(this, arguments) : Reflect.get(t, prop, recv);
           };
         }
@@ -108,53 +111,45 @@ const EARLY_PATCH_SCRIPT = `
     });
   } catch(e) { console.warn('[RH-PATCH] Proxy intercept failed:', e); }
 
-  // ── 3. navigator.onLine spoof ───────────────────────────────────────────────
+  // 3. navigator.onLine spoof
   try { Object.defineProperty(navigator, 'onLine', { value: true, configurable: true }); } catch(e) {}
 
-  // ── 4. postMessage MessagePort fix ─────────────────────────────────────────
-  // Fixes: "DataCloneError: MessagePort could not be cloned because it was not transferred"
-  // Hammerhead wraps postMessage and accidentally drops the transferables list.
-  // We guard the native postMessage so MessagePorts are always forwarded correctly.
+  // 4. postMessage MessagePort fix
+  // Fixes: "DataCloneError: MessagePort could not be cloned"
   var _origPM = window.postMessage;
   window.postMessage = function(msg, targetOrigin, transfer) {
     try {
-      if (transfer && transfer.length) {
-        return _origPM.call(window, msg, targetOrigin || '*', transfer);
-      }
+      if (transfer && transfer.length) return _origPM.call(window, msg, targetOrigin || '*', transfer);
       return _origPM.call(window, msg, targetOrigin || '*');
     } catch(e) {
-      // If hammerhead's wrapper still throws DataCloneError, send without ports
-      // (reCAPTCHA degrades gracefully; better than crashing the whole page)
-      try { return _origPM.call(window, msg, targetOrigin || '*'); } catch(e2) {}
+      try { _origPM.call(window, msg, targetOrigin || '*'); } catch(e2) {}
     }
   };
 
-  // ── 5. reCAPTCHA URL .match() guard ────────────────────────────────────────
+  // 5. reCAPTCHA .match() / RegExp guard
   // Fixes: "Cannot read properties of undefined (reading 'match')"
-  // Hammerhead rewrites URLs and sometimes produces undefined where recaptcha
-  // expects a string. We patch String.prototype.match to guard against this.
   var _origMatch = String.prototype.match;
-  String.prototype.match = function(pattern) {
-    return _origMatch.call(this == null ? '' : this, pattern);
-  };
-  // Also guard on the RegExp side — reCAPTCHA sometimes calls re.exec(undefined)
+  String.prototype.match = function(p) { return _origMatch.call(this == null ? '' : this, p); };
   var _origExec = RegExp.prototype.exec;
-  RegExp.prototype.exec = function(str) {
-    return _origExec.call(this, str == null ? '' : str);
-  };
+  RegExp.prototype.exec = function(s) { return _origExec.call(this, s == null ? '' : s); };
   var _origTest = RegExp.prototype.test;
-  RegExp.prototype.test = function(str) {
-    return _origTest.call(this, str == null ? '' : str);
-  };
+  RegExp.prototype.test = function(s) { return _origTest.call(this, s == null ? '' : s); };
+
+  // 6. BroadcastChannel polyfill (blocked in some proxy contexts)
+  if (typeof BroadcastChannel === 'undefined') {
+    window.BroadcastChannel = function(name) {
+      this.name = name; this.onmessage = null;
+      this.postMessage = function() {}; this.close = function() {};
+    };
+  }
 
   console.log('[RH-EARLY-PATCH] All patches applied.');
 })();
 `;
 
 // ─────────────────────────────────────────────────────────────────────────────
-// HAMMERHEAD POLYFILL — injected at the top of hammerhead.js body.
-// Runs inside the proxied page context to block ad-network requests that
-// cause YouTube's offline detection to trip.
+// HAMMERHEAD POLYFILL — injected into hammerhead.js
+// Runs inside the proxied page context
 // ─────────────────────────────────────────────────────────────────────────────
 const HAMMERHEAD_POLYFILL = `
 (function() {
@@ -182,18 +177,37 @@ const HAMMERHEAD_POLYFILL = `
     }
     return _oX.apply(this, arguments);
   };
+
+  // Mobile Safari: make touch event listeners passive to unblock scroll/tap
+  var _origAEL = EventTarget.prototype.addEventListener;
+  EventTarget.prototype.addEventListener = function(type, fn, opts) {
+    if (type === 'touchstart' || type === 'touchmove' || type === 'wheel') {
+      if (opts === undefined || opts === false) opts = { passive: true };
+      else if (typeof opts === 'object' && opts.passive === undefined) opts.passive = true;
+    }
+    return _origAEL.call(this, type, fn, opts);
+  };
+
+  // postMessage passthrough for mobile Safari
+  var _oPM = window.postMessage;
+  window.postMessage = function(msg, origin, transfer) {
+    try {
+      if (transfer && transfer.length) return _oPM.call(window, msg, origin || '*', transfer);
+      return _oPM.call(window, msg, origin || '*');
+    } catch(e) {
+      try { _oPM.call(window, msg, '*'); } catch(e2) {}
+    }
+  };
 })();
 `;
 
 // ─────────────────────────────────────────────────────────────────────────────
-// IFRAME-TASK POLYFILL — injected into iframe-task.js.
-// iframe-task runs inside every proxied iframe, including reCAPTCHA's bframe.
-// It needs the same addChangeEventListener patch as the main window.
+// IFRAME-TASK POLYFILL — injected into iframe-task.js
+// Runs inside every proxied iframe (including reCAPTCHA bframe)
 // ─────────────────────────────────────────────────────────────────────────────
 const IFRAME_TASK_POLYFILL = `
 (function() {
   'use strict';
-  // Re-apply addChangeEventListener inside every iframe context
   function attachCEL(obj) {
     if (!obj || typeof obj.addChangeEventListener === 'function') return;
     try {
@@ -217,7 +231,6 @@ const IFRAME_TASK_POLYFILL = `
   attachCEL(Object.prototype);
   if (typeof Storage !== 'undefined') attachCEL(Storage.prototype);
 
-  // postMessage MessagePort passthrough inside iframes
   if (typeof window !== 'undefined' && window.postMessage) {
     var _pm = window.postMessage;
     window.postMessage = function(msg, origin, transfer) {
@@ -225,13 +238,10 @@ const IFRAME_TASK_POLYFILL = `
         return transfer && transfer.length
           ? _pm.call(window, msg, origin || '*', transfer)
           : _pm.call(window, msg, origin || '*');
-      } catch(e) {
-        try { _pm.call(window, msg, origin || '*'); } catch(e2) {}
-      }
+      } catch(e) { try { _pm.call(window, msg, origin || '*'); } catch(e2) {} }
     };
   }
 
-  // String/RegExp guard for reCAPTCHA .match() on undefined
   var _om = String.prototype.match;
   String.prototype.match = function(p) { return _om.call(this == null ? '' : this, p); };
   var _oe = RegExp.prototype.exec;
@@ -285,16 +295,34 @@ function injectBeforeScript(res, injection) {
   };
 }
 
-// 3. SERVER
+// ─────────────────────────────────────────────────────────────────────────────
+// SERVER
+// ─────────────────────────────────────────────────────────────────────────────
 const server = createServer((req, res) => {
-  // Status endpoint
+
+  // ── Status / port endpoint ─────────────────────────────────────────────────
   if (req.url === '/mainport') {
     res.statusCode = 200;
     res.setHeader('Content-Type', 'application/json');
     return res.end(JSON.stringify(process.env.PORT || 8080));
   }
 
-  // Early patch — load BEFORE hammerhead.js in your HTML
+  // ── Debug endpoint — visit /debug in browser to inspect headers ────────────
+  if (req.url === '/debug') {
+    res.statusCode = 200;
+    res.setHeader('Content-Type', 'application/json');
+    return res.end(JSON.stringify({
+      nodeVersion:      process.version,
+      socketEncrypted:  !!(req.socket && req.socket.encrypted),
+      xForwardedProto:  req.headers['x-forwarded-proto'],
+      xForwardedHost:   req.headers['x-forwarded-host'],
+      host:             req.headers['host'],
+      userAgent:        req.headers['user-agent'],
+      remoteAddress:    req.socket && req.socket.remoteAddress,
+    }, null, 2));
+  }
+
+  // ── Early patch script ─────────────────────────────────────────────────────
   if (req.url === '/rh-early-patch.js') {
     res.statusCode = 200;
     res.setHeader('Content-Type', 'application/javascript');
@@ -302,28 +330,76 @@ const server = createServer((req, res) => {
     return res.end(EARLY_PATCH_SCRIPT);
   }
 
+  // ── Proxy routing ──────────────────────────────────────────────────────────
   if (shouldRouteRh(req)) {
+
+    // Strip security headers that Safari enforces too strictly on proxied content
+    const _blockedResponseHeaders = new Set([
+      'content-security-policy',
+      'content-security-policy-report-only',
+      'x-frame-options',
+      'x-xss-protection',
+      'cross-origin-opener-policy',
+      'cross-origin-embedder-policy',
+      'cross-origin-resource-policy',
+      'permissions-policy',
+    ]);
+    const _origSetHeader = res.setHeader.bind(res);
+    res.setHeader = function(name, value) {
+      if (_blockedResponseHeaders.has(name.toLowerCase())) return;
+      return _origSetHeader(name, value);
+    };
+    const _origWriteHead = res.writeHead;
+    res.writeHead = function(code, headers) {
+      if (headers) {
+        for (const key of Object.keys(headers)) {
+          if (_blockedResponseHeaders.has(key.toLowerCase())) delete headers[key];
+        }
+      }
+      return _origWriteHead.apply(res, arguments);
+    };
+
+    // Add permissive CORS for mobile Safari
+    _origSetHeader('Access-Control-Allow-Origin', '*');
+    _origSetHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS, HEAD');
+    _origSetHeader('Access-Control-Allow-Headers', '*');
+    _origSetHeader('Access-Control-Allow-Credentials', 'true');
+
+    // Handle Safari preflight OPTIONS immediately
+    if (req.method === 'OPTIONS') {
+      res.statusCode = 204;
+      return res.end();
+    }
+
+    // Tell Rammerhead this is HTTPS.
+    // socket.encrypted is read-only in Node 18+ — must use defineProperty.
     req.headers['x-forwarded-proto'] = 'https';
-    req.connection.encrypted = true;
-    if (req.headers['x-forwarded-host']) {
-      req.headers['host'] = req.headers['x-forwarded-host'];
+    forceEncrypted(req.socket);
+    forceEncrypted(req.connection);
+    if (req.socket && req.socket.socket) forceEncrypted(req.socket.socket);
+
+    // Normalise host header
+    const forwardedHost = req.headers['x-forwarded-host'];
+    if (forwardedHost) {
+      req.headers['host'] = forwardedHost.split(',')[0].trim();
     }
 
     const p = req.url;
 
-    // Inject ad-block polyfill into hammerhead.js (proxied page context)
     if (/\/hammerhead\.js(\?|$)/.test(p)) {
       injectBeforeScript(res, HAMMERHEAD_POLYFILL);
-    }
-    // Inject CEL + postMessage + match guard into iframe-task.js
-    // This is what makes reCAPTCHA's bframe work correctly
-    else if (/\/iframe-task\.js(\?|$)/.test(p)) {
+    } else if (/\/iframe-task\.js(\?|$)/.test(p)) {
       injectBeforeScript(res, IFRAME_TASK_POLYFILL);
     }
 
     return rh.emit("request", req, res);
   }
 
+  // ── Static file fallback ───────────────────────────────────────────────────
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  res.setHeader('Cross-Origin-Opener-Policy', 'unsafe-none');
+  res.setHeader('Cross-Origin-Embedder-Policy', 'unsafe-none');
+  res.setHeader('Cross-Origin-Resource-Policy', 'cross-origin');
   serveStaticFiles(req, res, () => {
     res.statusCode = 404;
     res.end('Not Found');
@@ -332,7 +408,13 @@ const server = createServer((req, res) => {
 
 server.on("upgrade", (req, socket, head) => {
   req.headers['x-forwarded-proto'] = 'https';
-  if (req.headers['x-forwarded-host']) req.headers['host'] = req.headers['x-forwarded-host'];
+  forceEncrypted(socket);
+  forceEncrypted(req.socket);
+  forceEncrypted(req.connection);
+
+  const forwardedHost = req.headers['x-forwarded-host'];
+  if (forwardedHost) req.headers['host'] = forwardedHost.split(',')[0].trim();
+
   if (shouldRouteRh(req)) {
     rh.emit("upgrade", req, socket, head);
   } else {
@@ -340,9 +422,24 @@ server.on("upgrade", (req, socket, head) => {
   }
 });
 
-server.on("listening", () => {
+server.on("listening", async () => {
   const addr = server.address();
   console.log(`🚀 Server running on port ${addr.port}`);
+  try {
+    const url = await ngrok.connect({
+      proto: 'http', addr: addr.port, host_header: 'rewrite', schemes: ['https']
+    });
+    console.log(`🚀 Public Internet URL: ${url}`);
+  } catch (err) {
+    try {
+      const fallbackUrl = await ngrok.connect({ proto: 'http', addr: addr.port });
+      console.log("\n=============================================");
+      console.log(`🚀 Public Internet URL (Fallback): ${fallbackUrl}`);
+      console.log("=============================================\n");
+    } catch (e) {
+      console.error("⚠ Fallback tunnel failed:", e.message);
+    }
+  }
 });
 
 server.listen({ port: process.env.PORT });
