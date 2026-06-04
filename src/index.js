@@ -5,8 +5,8 @@ import createRammerhead from "rammerhead/src/server/index.js";
 import serveStatic from "serve-static";
 
 // 2. ENVIRONMENT CONFIGURATIONS
-// Use PORT from environment (Render/HuggingFace inject this), fallback to 8080 locally
-process.env.PORT = process.env.PORT || 8080;
+// Use PORT from environment (Render/HuggingFace inject this), 
+process.env.PORT = process.env.PORT || 3000;
 
 const serveStaticFiles = serveStatic(fileURLToPath(new URL("../static/", import.meta.url)));
 
@@ -303,7 +303,7 @@ const server = createServer((req, res) => {
   if (req.url === '/mainport') {
     res.statusCode = 200;
     res.setHeader('Content-Type', 'application/json');
-    return res.end(JSON.stringify(process.env.PORT || 8080));
+    return res.end(JSON.stringify(process.env.PORT || 3000));
   }
 
   // ── Debug endpoint — visit /debug in browser to inspect headers ────────────
